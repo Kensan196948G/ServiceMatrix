@@ -4,235 +4,135 @@ ServiceMatrix Traceability Matrix
 
 Version: 1.0
 Status: Active
-Classification: Internal Audit Document
+Classification: Confidential - Audit Document
 Last Updated: 2026-03-02
 
 ---
 
 ## 1. 概要
 
-本ドキュメントは、ServiceMatrix における要件・設計・実装・テスト・エビデンスの
-トレーサビリティ（追跡可能性）を定義する。
-各要素間の紐づけを明確にし、監査時の証跡追跡を効率化する。
+本ドキュメントは、ServiceMatrix プロジェクトにおける要件・設計・実装・テスト・証跡のトレーサビリティを定義する。
+J-SOX IT全般統制の各要件から、実装箇所・テスト証跡・監査証跡までの完全な追跡可能性を提供する。
 
 ---
 
-## 2. トレーサビリティ構造
+## 2. トレーサビリティの目的
 
-### 2.1 トレーサビリティチェーン
+| 目的 | 説明 |
+|------|------|
+| 規制準拠の証明 | J-SOX・ISO 20000の要件が実装されていることを証明する |
+| 影響分析 | 要件変更時の影響範囲を迅速に特定する |
+| テスト網羅性確認 | すべての要件がテストされていることを確認する |
+| 監査効率化 | 監査人が要件〜証跡を効率的に追跡できるようにする |
+
+---
+
+## 3. 要件〜実装〜テスト〜証跡 トレーサビリティマトリクス
+
+### 3.1 アクセス管理（J-SOX AC統制）
+
+| 統制ID | 要件 | 実装箇所 | テストケース | 証跡テーブル |
+|--------|------|---------|------------|------------|
+| AC-001 | ユーザーアカウントの適切な管理 | `src/services/auth/user.service.ts` | `tests/unit/auth/user.service.test.ts` | `audit_logs` |
+| AC-002 | 権限付与・変更の承認記録 | `src/services/auth/rbac.service.ts` | `tests/unit/auth/rbac.service.test.ts` | `audit_logs` |
+| AC-003 | 特権アカウント使用の記録 | `src/middleware/auth.middleware.ts` | `tests/integration/auth/middleware.test.ts` | `audit_logs` |
+| AC-004 | ログイン認証の記録 | `src/services/auth/session.service.ts` | `tests/unit/auth/session.service.test.ts` | `auth_logs` |
+| AC-005 | セッション管理の制御 | `src/services/auth/session.service.ts` | `tests/integration/auth/session.test.ts` | `session_logs` |
+| AC-006 | 職務分離（SoD）の実施 | `src/services/sod/sod.service.ts` | `tests/unit/sod/sod.service.test.ts` | `sod_violations` |
+| AC-007 | 定期アクセス権限レビュー | GitHub Issue テンプレート（四半期） | 手動確認 | GitHub Issue |
+
+### 3.2 変更管理（J-SOX CM統制）
+
+| 統制ID | 要件 | 実装箇所 | テストケース | 証跡テーブル |
+|--------|------|---------|------------|------------|
+| CM-001 | 変更要求の承認プロセス | `src/services/change/change-request.service.ts` | `tests/unit/change/change-request.service.test.ts` | `change_requests` |
+| CM-002 | 変更の承認者記録 | `src/services/change/approval.service.ts` | `tests/unit/change/approval.service.test.ts` | `change_approvals` |
+| CM-003 | 変更実施の記録 | GitHub Actions CI/CD | CI テストログ | `deployments` |
+| CM-004 | 緊急変更の管理 | `src/services/change/emergency-change.service.ts` | `tests/unit/change/emergency-change.service.test.ts` | `emergency_changes` |
+| CM-005 | テスト実施の記録 | GitHub Actions CI/CD | GitHub Actions アーティファクト | GitHub |
+| CM-006 | ロールバック管理 | `src/services/change/rollback.service.ts` | `tests/unit/change/rollback.service.test.ts` | `rollback_records` |
+
+### 3.3 運用管理（J-SOX OP統制）
+
+| 統制ID | 要件 | 実装箇所 | テストケース | 証跡テーブル |
+|--------|------|---------|------------|------------|
+| OP-001 | インシデント管理プロセス | `src/services/incident/incident.service.ts` | `tests/unit/incident/incident.service.test.ts` | `incidents` |
+| OP-002 | SLA監視 | `src/services/sla/sla-engine.service.ts` | `tests/unit/sla/sla-engine.service.test.ts` | `sla_measurements` |
+| OP-003 | バックアップ管理 | バックアップスクリプト | 手動確認 + ログ | バックアップログ |
+| OP-004 | キャパシティ管理 | Prometheus / Grafana 監視設定 | 監視設定テスト | Prometheus |
+
+### 3.4 AI統治（SM AI統制）
+
+| 統制ID | 要件 | 実装箇所 | テストケース | 証跡テーブル |
+|--------|------|---------|------------|------------|
+| AI-001 | AI判断の記録 | `src/services/ai/ai-decision-logger.service.ts` | `tests/unit/ai/ai-decision-logger.service.test.ts` | `ai_decision_logs` |
+| AI-002 | 人間承認ゲート | `src/services/ai/approval-gate.service.ts` | `tests/unit/ai/approval-gate.service.test.ts` | `ai_approval_logs` |
+| AI-003 | 自律レベル制御 | `src/services/ai/autonomy-controller.service.ts` | `tests/unit/ai/autonomy-controller.service.test.ts` | `ai_config_logs` |
+| AI-004 | AIキルスイッチ | `src/services/ai/kill-switch.service.ts` | `tests/unit/ai/kill-switch.service.test.ts` | `ai_emergency_stops` |
+
+---
+
+## 4. テスト種別 × 要件 カバレッジマトリクス
+
+| 要件カテゴリ | ユニットテスト | 統合テスト | E2Eテスト | セキュリティテスト |
+|------------|-------------|-----------|---------|----------------|
+| アクセス管理（AC） | Yes | Yes | Yes（P1フロー） | Yes |
+| 変更管理（CM） | Yes | Yes | Yes（P1フロー） | Yes（SoD検証） |
+| 運用管理（OP） | Yes | Yes | 部分的 | 部分的 |
+| AI統治（AI） | Yes | Yes | Yes（P1フロー） | Yes |
+| 監査ログ（AL） | Yes | Yes | 部分的 | 部分的 |
+| SLA管理（SLA） | Yes | Yes | 部分的 | No |
+
+---
+
+## 5. 変更追跡
+
+### 5.1 要件変更トレーサビリティ
+
+要件が変更された場合、以下の全要素への影響を追跡する。
 
 ```
-[要件]
+要件変更
   |
-  +-- 統制要件（J-SOX / ISO 20000 / ISO 27001）
-  |     |
-  v     v
-[設計]
+  v
+影響する実装ファイルの特定
   |
-  +-- アーキテクチャ設計書
-  +-- API設計書
-  +-- データモデル設計書
-  |     |
-  v     v
-[実装]
+  v
+影響するテストケースの特定
   |
-  +-- ソースコード
-  +-- 設定ファイル
-  +-- CI/CDパイプライン
-  |     |
-  v     v
-[テスト]
+  v
+影響する証跡の特定
   |
-  +-- テストケース
-  +-- テスト結果
-  +-- カバレッジレポート
-  |     |
-  v     v
-[エビデンス]
+  v
+Change Issue 作成（影響範囲を明記）
   |
-  +-- 監査ログ
-  +-- 承認記録
-  +-- 運用記録
+  v
+実装・テスト更新
+  |
+  v
+本マトリクスの更新
 ```
 
-### 2.2 識別子体系
+### 5.2 トレーサビリティの維持
 
-| 要素 | 識別子形式 | 例 |
-|------|-----------|-----|
-| 統制要件 | `{規格}-{番号}` | ITGC-01, A.9.1 |
-| 機能要件 | `FR-{カテゴリ}-{番号}` | FR-INC-001 |
-| 非機能要件 | `NFR-{カテゴリ}-{番号}` | NFR-PERF-001 |
-| 設計文書 | `DD-{カテゴリ}-{番号}` | DD-ARCH-001 |
-| テストケース | `TC-{カテゴリ}-{番号}` | TC-INC-001 |
-| エビデンス | `EV-{カテゴリ}-{番号}` | EV-AUDIT-001 |
-
----
-
-## 3. 機能要件トレーサビリティ
-
-### 3.1 インシデント管理
-
-| 要件ID | 要件 | 設計文書 | 実装 | テスト | エビデンス |
-|--------|------|---------|------|--------|-----------|
-| FR-INC-001 | インシデント作成 | DD-ARCH-001 | src/services/incident/ | TC-INC-001〜005 | EV-AUDIT-001 |
-| FR-INC-002 | インシデント分類・優先度設定 | DD-ARCH-001 | src/services/incident/ | TC-INC-006〜010 | EV-AUDIT-002 |
-| FR-INC-003 | インシデント割り当て | DD-ARCH-001 | src/services/incident/ | TC-INC-011〜015 | EV-AUDIT-003 |
-| FR-INC-004 | インシデント状態遷移 | DD-ARCH-002 | src/services/incident/ | TC-INC-016〜025 | EV-AUDIT-004 |
-| FR-INC-005 | SLA計測開始/停止 | DD-SLA-001 | src/services/sla/ | TC-INC-026〜030 | EV-SLA-001 |
-| FR-INC-006 | エスカレーション | DD-ARCH-003 | src/services/incident/ | TC-INC-031〜035 | EV-AUDIT-005 |
-
-### 3.2 変更管理
-
-| 要件ID | 要件 | 設計文書 | 実装 | テスト | エビデンス |
-|--------|------|---------|------|--------|-----------|
-| FR-CHG-001 | RFC作成 | DD-ARCH-004 | src/services/change/ | TC-CHG-001〜005 | EV-CHG-001 |
-| FR-CHG-002 | リスク評価（自動） | DD-RISK-001 | src/services/risk/ | TC-CHG-006〜010 | EV-CHG-002 |
-| FR-CHG-003 | 影響分析 | DD-CMDB-001 | src/services/cmdb/ | TC-CHG-011〜015 | EV-CHG-003 |
-| FR-CHG-004 | CABレビュー | DD-ARCH-005 | src/services/change/ | TC-CHG-016〜020 | EV-CHG-004 |
-| FR-CHG-005 | 承認フロー | DD-GOV-001 | src/services/change/ | TC-CHG-021〜025 | EV-CHG-005 |
-| FR-CHG-006 | 変更実施記録 | DD-ARCH-006 | src/services/change/ | TC-CHG-026〜030 | EV-CHG-006 |
-| FR-CHG-007 | PIR（事後レビュー） | DD-ARCH-007 | src/services/change/ | TC-CHG-031〜035 | EV-CHG-007 |
-
-### 3.3 CMDB管理
-
-| 要件ID | 要件 | 設計文書 | 実装 | テスト | エビデンス |
-|--------|------|---------|------|--------|-----------|
-| FR-CMDB-001 | CI登録・更新 | DD-CMDB-001 | src/services/cmdb/ | TC-CMDB-001〜005 | EV-CMDB-001 |
-| FR-CMDB-002 | 依存関係管理 | DD-CMDB-002 | src/services/cmdb/ | TC-CMDB-006〜010 | EV-CMDB-002 |
-| FR-CMDB-003 | 影響分析 | DD-CMDB-003 | src/services/cmdb/ | TC-CMDB-011〜015 | EV-CMDB-003 |
-| FR-CMDB-004 | 変更履歴追跡 | DD-CMDB-004 | src/services/cmdb/ | TC-CMDB-016〜020 | EV-CMDB-004 |
-
-### 3.4 AI統治
-
-| 要件ID | 要件 | 設計文書 | 実装 | テスト | エビデンス |
-|--------|------|---------|------|--------|-----------|
-| FR-AI-001 | AI提案生成 | DD-AI-001 | src/services/agent/ | TC-AI-001〜005 | EV-AI-001 |
-| FR-AI-002 | 人間承認ゲート | DD-AI-002 | src/services/agent/ | TC-AI-006〜010 | EV-AI-002 |
-| FR-AI-003 | AI判断ログ記録 | DD-AI-003 | src/services/agent/ | TC-AI-011〜015 | EV-AI-003 |
-| FR-AI-004 | 自律レベル制御 | DD-AI-004 | src/services/agent/ | TC-AI-016〜020 | EV-AI-004 |
-| FR-AI-005 | キルスイッチ | DD-AI-005 | src/services/agent/ | TC-AI-021〜025 | EV-AI-005 |
-
----
-
-## 4. 非機能要件トレーサビリティ
-
-### 4.1 パフォーマンス要件
-
-| 要件ID | 要件 | 基準値 | テスト | エビデンス |
-|--------|------|--------|--------|-----------|
-| NFR-PERF-001 | API応答時間 | P95 < 200ms | TC-PERF-001 | k6テスト結果 |
-| NFR-PERF-002 | ページロード時間 | LCP < 2.5s | TC-PERF-002 | Lighthouse レポート |
-| NFR-PERF-003 | 同時接続ユーザー | 100以上 | TC-PERF-003 | k6テスト結果 |
-| NFR-PERF-004 | データベースクエリ | P95 < 50ms | TC-PERF-004 | pg_stat結果 |
-
-### 4.2 セキュリティ要件
-
-| 要件ID | 要件 | テスト | エビデンス |
-|--------|------|--------|-----------|
-| NFR-SEC-001 | 認証（GitHub OAuth） | TC-SEC-001〜005 | SASTレポート + DASTレポート |
-| NFR-SEC-002 | 認可（RBAC） | TC-SEC-006〜015 | 認可テスト結果 |
-| NFR-SEC-003 | データ暗号化（保存時） | TC-SEC-016〜018 | 暗号化設定確認記録 |
-| NFR-SEC-004 | データ暗号化（転送時） | TC-SEC-019〜020 | TLS設定確認記録 |
-| NFR-SEC-005 | 監査ログ記録 | TC-SEC-021〜025 | 監査ログ検証結果 |
-| NFR-SEC-006 | 職務分離（SoD） | TC-SEC-026〜030 | SoD検証結果 |
-| NFR-SEC-007 | 入力バリデーション | TC-SEC-031〜035 | SAST/DASTレポート |
-
-### 4.3 可用性要件
-
-| 要件ID | 要件 | 基準値 | テスト | エビデンス |
-|--------|------|--------|--------|-----------|
-| NFR-AVL-001 | システム可用性 | 99.9% | TC-AVL-001 | 可用性モニタリング記録 |
-| NFR-AVL-002 | RTO | 4時間以下 | TC-AVL-002 | DR訓練記録 |
-| NFR-AVL-003 | RPO | 1時間以下 | TC-AVL-003 | バックアップ検証記録 |
-
----
-
-## 5. 統制要件と機能の対応マトリクス
-
-### 5.1 J-SOX統制 → 機能マッピング
-
-| 統制ID | 統制要件 | 関連機能要件 | テスト | エビデンス種別 |
-|--------|---------|------------|--------|-------------|
-| ITGC-01 | ユーザー認証 | NFR-SEC-001 | TC-SEC-001〜005 | 認証ログ |
-| ITGC-02 | 権限付与 | NFR-SEC-002 | TC-SEC-006〜015 | 権限変更記録 |
-| ITGC-03 | 権限レビュー | NFR-SEC-002 | TC-SEC-010 | レビュー記録 |
-| ITGC-04 | 変更要求記録 | FR-CHG-001 | TC-CHG-001〜005 | RFC |
-| ITGC-05 | テスト記録 | FR-CHG-006 | TC-CHG-026〜030 | テスト結果 |
-| ITGC-06 | 承認記録 | FR-CHG-005 | TC-CHG-021〜025 | PR承認記録 |
-| ITGC-07 | 実施記録 | FR-CHG-006 | TC-CHG-026〜030 | デプロイログ |
-| ITGC-08 | バックアップ | NFR-AVL-003 | TC-AVL-003 | バックアップログ |
-| ITGC-09 | 障害対応 | FR-INC-001〜006 | TC-INC-001〜035 | インシデント記録 |
-| ITGC-10 | 監視 | NFR-AVL-001 | TC-AVL-001 | 監視記録 |
-
-### 5.2 ISO 20000条項 → 機能マッピング
-
-| 条項 | 要件 | 関連機能要件 | テスト | エビデンス種別 |
-|------|------|------------|--------|-------------|
-| 6.1 | SLA管理 | FR-INC-005 | TC-INC-026〜030 | SLA記録 |
-| 8.1 | インシデント管理 | FR-INC-001〜006 | TC-INC-001〜035 | インシデント記録 |
-| 9.1 | 変更管理 | FR-CHG-001〜007 | TC-CHG-001〜035 | 変更記録 |
-| 9.3 | 構成管理 | FR-CMDB-001〜004 | TC-CMDB-001〜020 | CMDB記録 |
-
----
-
-## 6. テストケースと統制の対応
-
-### 6.1 テスト種別と統制カバレッジ
-
-| テスト種別 | カバーする統制 | テストケース数（目安） |
-|-----------|--------------|---------------------|
-| ユニットテスト | FR全般（ロジック検証） | 500+ |
-| 統合テスト | ITGC-04〜07（連携検証） | 150+ |
-| E2Eテスト | FR全般（フロー検証） | 50+ |
-| セキュリティテスト | NFR-SEC全般 | 100+ |
-| パフォーマンステスト | NFR-PERF全般 | 30+ |
-| 監査ログテスト | ITGC-01〜03, ITAC-02 | 50+ |
-
-### 6.2 テストカバレッジギャップ分析
-
-四半期ごとに以下の観点でギャップ分析を実施する。
-
-| 分析項目 | 内容 | 期待結果 |
-|---------|------|---------|
-| 要件 → テスト | 全要件にテストケースが存在するか | 100%カバー |
-| 統制 → テスト | 全統制にテストケースが存在するか | 100%カバー |
-| テスト → エビデンス | 全テスト結果がエビデンスとして保存されるか | 100%保存 |
-| 統制 → エビデンス | 全統制にエビデンスが存在するか | 100%カバー |
-
----
-
-## 7. 変更時のトレーサビリティ維持
-
-### 7.1 変更影響分析
-
-機能変更時、以下のトレーサビリティチェーンの更新を確認する。
-
-| 変更種別 | 影響分析対象 | 更新必要な要素 |
-|---------|------------|-------------|
-| 要件変更 | 設計→実装→テスト→エビデンス | 全チェーン |
-| 設計変更 | 実装→テスト→エビデンス | 設計以降 |
-| 実装変更 | テスト→エビデンス | テスト以降 |
-| 統制変更 | 要件→設計→実装→テスト→エビデンス | 全チェーン |
-
-### 7.2 トレーサビリティレビュー
-
-| レビュー | 頻度 | 担当 |
+| 維持活動 | 頻度 | 担当 |
 |---------|------|------|
-| PRレビュー時 | 毎PR | レビュアー |
-| リリースレビュー時 | リリース毎 | テックリード |
-| 監査前レビュー | 監査前 | Auditor |
-| 定期レビュー | 四半期 | ProcessOwner |
+| マトリクスのレビュー・更新 | リリース毎 | テックリード + QAエンジニア |
+| 証跡の完全性確認 | 月次 | 内部監査担当 |
+| J-SOX要件との整合確認 | 四半期 | コンプライアンス担当 |
+| 新規要件の追加 | 都度 | 要件追加時に担当者 |
 
 ---
 
-## 8. 関連ドキュメント
+## 6. 関連ドキュメント
 
 | ドキュメント | 参照先 |
 |---|---|
-| 監査エビデンスマッピング | [AUDIT_EVIDENCE_MAPPING.md](./AUDIT_EVIDENCE_MAPPING.md) |
-| エビデンス収集手順 | [EVIDENCE_COLLECTION_PROCEDURE.md](./EVIDENCE_COLLECTION_PROCEDURE.md) |
+| 監査証跡マッピング | [AUDIT_EVIDENCE_MAPPING.md](./AUDIT_EVIDENCE_MAPPING.md) |
+| 証跡収集手順 | [EVIDENCE_COLLECTION_PROCEDURE.md](./EVIDENCE_COLLECTION_PROCEDURE.md) |
 | コンプライアンスチェックリスト | [COMPLIANCE_CHECKLIST.md](./COMPLIANCE_CHECKLIST.md) |
-| ServiceMatrix 憲章 | [SERVICEMATRIX_CHARTER.md](../00_foundation/SERVICEMATRIX_CHARTER.md) |
+| テスト戦略 | [TEST_STRATEGY.md](../13_testing_quality/TEST_STRATEGY.md) |
+| 承認制御モデル | [APPROVAL_CONTROL_MODEL.md](../01_governance/APPROVAL_CONTROL_MODEL.md) |
 
 ---
 
