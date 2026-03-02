@@ -184,6 +184,54 @@ jobs:
           retention-days: 30
 
   # ─────────────────────────────────────────────────
+  # Job 8: Ruff Lint (uv)
+  # ─────────────────────────────────────────────────
+  lint:
+    name: Ruff Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
+      - run: uv pip install --system ruff
+      - run: ruff check src/ --output-format=github
+      - run: ruff format src/ --check
+
+  # ─────────────────────────────────────────────────
+  # Job 9: Type Check (mypy)
+  # ─────────────────────────────────────────────────
+  type-check:
+    name: Type Check (mypy)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install mypy types-passlib
+      - run: pip install -e ".[dev]" || pip install sqlalchemy pydantic fastapi structlog
+      - name: Run mypy
+        run: mypy src/ --ignore-missing-imports --no-strict-optional --exclude 'alembic/' || true
+        continue-on-error: true
+
+  # ─────────────────────────────────────────────────
+  # Job 10: Security Scan (bandit)
+  # ─────────────────────────────────────────────────
+  security:
+    name: Security Scan (bandit)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: pip install bandit[toml]
+      - run: bandit -r src/ -ll --skip B101 -f json -o bandit-report.json || true
+      - name: Upload bandit report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: bandit-security-report
+          path: bandit-report.json
+
+  # ─────────────────────────────────────────────────
   # Job 5: Summary Report
   # ─────────────────────────────────────────────────
   ci-summary:
@@ -195,6 +243,9 @@ jobs:
       - validate-config-files
       - python-lint
       - python-test
+      - lint
+      - type-check
+      - security
     if: always()
     steps:
       - name: Checkout
@@ -211,5 +262,8 @@ jobs:
           echo "| Config Validation | ${{ needs.validate-config-files.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Python Lint | ${{ needs.python-lint.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Python Tests | ${{ needs.python-test.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Ruff Lint | ${{ needs.lint.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Type Check (mypy) | ${{ needs.type-check.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Security Scan (bandit) | ${{ needs.security.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "🕐 実行時刻: $(date '+%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
