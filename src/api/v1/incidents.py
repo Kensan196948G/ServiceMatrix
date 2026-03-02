@@ -3,8 +3,8 @@ import uuid
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.database import get_db
 from src.middleware.rbac import get_current_user, require_role
@@ -12,14 +12,18 @@ from src.models.incident import Incident
 from src.models.user import User, UserRole
 from src.schemas.common import PaginatedResponse
 from src.schemas.incident import (
-    IncidentCreate, IncidentResponse, IncidentStatusTransition, IncidentUpdate
+    IncidentCreate,
+    IncidentResponse,
+    IncidentStatusTransition,
+    IncidentUpdate,
 )
 from src.services import incident_service
 
 router = APIRouter(prefix="/incidents", tags=["incidents"])
 
 
-@router.get("", response_model=PaginatedResponse[IncidentResponse])
+@router.get("", response_model=PaginatedResponse[IncidentResponse], summary="インシデント一覧取得",
+            description="フィルタ・ページネーション対応のインシデント一覧を返します。")
 async def list_incidents(
     db: Annotated[AsyncSession, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
@@ -51,7 +55,9 @@ async def list_incidents(
     )
 
 
-@router.post("", response_model=IncidentResponse, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=IncidentResponse, status_code=status.HTTP_201_CREATED,
+             summary="インシデント作成",
+             description="新規インシデントを作成します。SLA自動計算・優先度設定に対応。")
 async def create_incident(
     data: IncidentCreate,
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -65,7 +71,8 @@ async def create_incident(
     return incident
 
 
-@router.get("/{incident_id}", response_model=IncidentResponse)
+@router.get("/{incident_id}", response_model=IncidentResponse, summary="インシデント詳細取得",
+            description="指定されたIDのインシデント詳細を返します。")
 async def get_incident(
     incident_id: uuid.UUID,
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -81,7 +88,8 @@ async def get_incident(
     return incident
 
 
-@router.patch("/{incident_id}", response_model=IncidentResponse)
+@router.patch("/{incident_id}", response_model=IncidentResponse, summary="インシデント更新",
+              description="指定されたIDのインシデントを部分更新します。")
 async def update_incident(
     incident_id: uuid.UUID,
     data: IncidentUpdate,
@@ -104,7 +112,9 @@ async def update_incident(
     return incident
 
 
-@router.post("/{incident_id}/transitions", response_model=IncidentResponse)
+@router.post("/{incident_id}/transitions", response_model=IncidentResponse,
+             summary="インシデントステータス遷移",
+             description="インシデントのステータスをITILワークフローに従って遷移させます。")
 async def transition_incident_status(
     incident_id: uuid.UUID,
     transition: IncidentStatusTransition,

@@ -3,15 +3,19 @@ import uuid
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.database import get_db
 from src.middleware.rbac import get_current_user, require_role
 from src.models.change import Change
 from src.models.user import User, UserRole
 from src.schemas.change import (
-    CABApproval, ChangeCreate, ChangeResponse, ChangeStatusTransition, ChangeUpdate
+    CABApproval,
+    ChangeCreate,
+    ChangeResponse,
+    ChangeStatusTransition,
+    ChangeUpdate,
 )
 from src.schemas.common import PaginatedResponse
 from src.services import change_service
@@ -19,7 +23,8 @@ from src.services import change_service
 router = APIRouter(prefix="/changes", tags=["changes"])
 
 
-@router.get("", response_model=PaginatedResponse[ChangeResponse])
+@router.get("", response_model=PaginatedResponse[ChangeResponse], summary="変更一覧取得",
+            description="フィルタ・ページネーション対応の変更リクエスト一覧を返します。")
 async def list_changes(
     db: Annotated[AsyncSession, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
@@ -48,7 +53,9 @@ async def list_changes(
     )
 
 
-@router.post("", response_model=ChangeResponse, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=ChangeResponse, status_code=status.HTTP_201_CREATED,
+             summary="変更リクエスト作成",
+             description="新規変更リクエストを作成します。リスクスコアが自動計算されます。")
 async def create_change(
     data: ChangeCreate,
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -63,7 +70,8 @@ async def create_change(
     return change
 
 
-@router.get("/{change_id}", response_model=ChangeResponse)
+@router.get("/{change_id}", response_model=ChangeResponse, summary="変更詳細取得",
+            description="指定されたIDの変更リクエスト詳細を返します。")
 async def get_change(
     change_id: uuid.UUID,
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -77,7 +85,8 @@ async def get_change(
     return change
 
 
-@router.patch("/{change_id}", response_model=ChangeResponse)
+@router.patch("/{change_id}", response_model=ChangeResponse, summary="変更更新",
+              description="指定されたIDの変更リクエストを部分更新します。")
 async def update_change(
     change_id: uuid.UUID,
     data: ChangeUpdate,
@@ -99,7 +108,9 @@ async def update_change(
     return change
 
 
-@router.post("/{change_id}/transitions", response_model=ChangeResponse)
+@router.post("/{change_id}/transitions", response_model=ChangeResponse,
+             summary="変更ステータス遷移",
+             description="変更リクエストのステータスをCABワークフローに従って遷移させます。")
 async def transition_change_status(
     change_id: uuid.UUID,
     transition: ChangeStatusTransition,
@@ -121,7 +132,11 @@ async def transition_change_status(
     return change
 
 
-@router.post("/{change_id}/cab-approval", response_model=ChangeResponse)
+@router.post("/{change_id}/cab-approval", response_model=ChangeResponse,
+             summary="CAB承認・却下",
+             description=(
+                 "Change Advisory Board (CAB) による変更リクエストの承認または却下を行います。"
+             ))
 async def cab_approval(
     change_id: uuid.UUID,
     approval: CABApproval,
