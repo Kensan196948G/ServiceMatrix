@@ -1,13 +1,13 @@
 """変更管理ビジネスロジック - リスクスコアリング・CAB承認フロー"""
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.models.change import Change
 from src.core.logging import get_logger
+from src.models.change import Change
 
 logger = get_logger(__name__)
 
@@ -46,7 +46,7 @@ CAB_REQUIRED_TYPES = {"Normal", "Emergency", "Major"}
 
 async def _get_next_change_number(db: AsyncSession) -> str:
     """CHG-YYYY-NNNNNN形式の変更番号を生成"""
-    year = datetime.now(timezone.utc).year
+    year = datetime.now(UTC).year
     result = await db.execute(select(func.nextval("change_seq")))
     seq = result.scalar_one()
     return f"CHG-{year}-{seq:06d}"
@@ -87,7 +87,7 @@ async def create_change(db: AsyncSession, data: dict[str, Any]) -> Change:
         change_number=change_number,
         risk_score=risk_score,
         risk_level=risk_level,
-        created_at=datetime.now(timezone.utc),
+        created_at=datetime.now(UTC),
         **{k: v for k, v in data.items() if k not in ("created_at",)},
     )
     db.add(change)
@@ -107,7 +107,7 @@ async def transition_change_status(
             f"ステータス '{change.status}' から '{new_status}' への遷移は許可されていません。"
         )
     change.status = new_status
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     if new_status == "In_Progress":
         change.actual_start_at = now
     elif new_status in {"Completed", "Failed"}:
@@ -126,7 +126,7 @@ async def approve_by_cab(
         raise ValueError("CABレビュー状態のみ承認・却下可能です")
 
     change.cab_approved_by = approver_id if approved else None
-    change.cab_reviewed_at = datetime.now(timezone.utc)
+    change.cab_reviewed_at = datetime.now(UTC)
     change.cab_notes = notes
     change.status = "Approved" if approved else "Rejected"
 

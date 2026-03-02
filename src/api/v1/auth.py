@@ -1,17 +1,22 @@
 """認証API - /auth/login, /auth/refresh, /auth/me"""
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.database import get_db
-from src.core.security import verify_password, create_access_token, create_refresh_token, decode_token
+from src.core.security import (
+    create_access_token,
+    create_refresh_token,
+    decode_token,
+    verify_password,
+)
 from src.middleware.rbac import get_current_user
 from src.models.user import User
-from src.schemas.auth import LoginRequest, TokenResponse, RefreshRequest, UserResponse
+from src.schemas.auth import LoginRequest, RefreshRequest, TokenResponse, UserResponse
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -43,7 +48,7 @@ async def login(
     refresh_token = create_refresh_token(token_data)
 
     # 最終ログイン時刻を更新
-    user.last_login_at = datetime.now(timezone.utc)
+    user.last_login_at = datetime.now(UTC)
     await db.flush()
 
     return TokenResponse(
@@ -74,7 +79,9 @@ async def refresh_token(
     )
     user = result.scalar_one_or_none()
     if not user or not user.is_active:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="ユーザーが存在しません")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="ユーザーが存在しません"
+        )
 
     token_data = {"sub": str(user.user_id), "role": user.role.value}
     return TokenResponse(

@@ -25,13 +25,17 @@ async def github_webhook(
         if not signature or not webhook_service.verify_webhook_signature(
             payload_bytes, signature, settings.github_webhook_secret
         ):
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid webhook signature")
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN, detail="Invalid webhook signature"
+            )
 
     import json
     try:
         payload = json.loads(payload_bytes)
-    except Exception:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid JSON payload")
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid JSON payload"
+        ) from exc
 
     action = payload.get("action")
     logger.info("github_webhook_received", event_type=event_type, action=action)

@@ -14,7 +14,9 @@ class ServiceRequest(Base, TimestampMixin):
     __tablename__ = "service_requests"
     __table_args__ = (
         CheckConstraint(
-            "status IN ('New','Pending_Approval','Approved','In_Progress','Fulfilled','Rejected','Cancelled')",
+            "status IN ("
+            "'New','Pending_Approval','Approved','In_Progress','Fulfilled','Rejected','Cancelled'"
+            ")",
             name="chk_sr_status"
         ),
     )
@@ -46,12 +48,12 @@ class ServiceRequest(Base, TimestampMixin):
     fulfilled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     # リレーション
-    requester: Mapped["User | None"] = relationship(
+    requester: Mapped["User | None"] = relationship(  # noqa: F821
         "User", foreign_keys=[requested_by], lazy="select"
     )
-    assignee: Mapped["User | None"] = relationship(
+    assignee: Mapped["User | None"] = relationship(  # noqa: F821
         "User", foreign_keys=[assigned_to], lazy="select"
     )
-    approver: Mapped["User | None"] = relationship(
+    approver: Mapped["User | None"] = relationship(  # noqa: F821
         "User", foreign_keys=[approved_by], lazy="select"
     )

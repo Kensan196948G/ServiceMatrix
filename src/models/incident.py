@@ -1,23 +1,23 @@
 """インシデント管理モデル（月次パーティション対応）"""
-import uuid
 import enum
+import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, Enum, ForeignKey, Integer, String, Text, CheckConstraint
+from sqlalchemy import CheckConstraint, DateTime, ForeignKey, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.models.base import Base, TimestampMixin
 
 
-class IncidentPriority(str, enum.Enum):
+class IncidentPriority(enum.StrEnum):
     P1 = "P1"
     P2 = "P2"
     P3 = "P3"
     P4 = "P4"
 
 
-class IncidentStatus(str, enum.Enum):
+class IncidentStatus(enum.StrEnum):
     NEW = "New"
     ACKNOWLEDGED = "Acknowledged"
     IN_PROGRESS = "In_Progress"
@@ -91,12 +91,12 @@ class Incident(Base, TimestampMixin):
     resolution_notes: Mapped[str | None] = mapped_column(Text)
 
     # リレーション
-    assignee: Mapped["User | None"] = relationship(
+    assignee: Mapped["User | None"] = relationship(  # noqa: F821
         "User", foreign_keys=[assigned_to], lazy="select"
     )
-    assigned_team: Mapped["Team | None"] = relationship(
+    assigned_team: Mapped["Team | None"] = relationship(  # noqa: F821
         "Team", foreign_keys=[assigned_team_id], lazy="select"
     )
-    reporter: Mapped["User | None"] = relationship(
+    reporter: Mapped["User | None"] = relationship(  # noqa: F821
         "User", foreign_keys=[reported_by], lazy="select"
     )

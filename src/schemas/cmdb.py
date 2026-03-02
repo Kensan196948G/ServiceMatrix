@@ -1,6 +1,7 @@
 """CMDB管理Pydanticスキーマ"""
 import uuid
 from datetime import datetime
+
 from pydantic import BaseModel, Field, field_validator
 
 
@@ -27,7 +28,10 @@ class CIUpdate(BaseModel):
     @classmethod
     def validate_status(cls, v: str | None) -> str | None:
         if v is not None and v not in ("Active", "Inactive", "Maintenance", "Retired"):
-            raise ValueError(f"無効なステータス: {v}。Active/Inactive/Maintenance/Retired のいずれかを指定してください")
+            raise ValueError(
+                f"無効なステータス: {v}。"
+                "Active/Inactive/Maintenance/Retired のいずれかを指定してください"
+            )
         return v
 
 

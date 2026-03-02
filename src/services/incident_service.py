@@ -1,13 +1,13 @@
 """インシデント管理ビジネスロジック - SLAタイマー・優先度・ステータス遷移"""
 import re
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.models.incident import Incident
 from src.core.logging import get_logger
+from src.models.incident import Incident
 
 logger = get_logger(__name__)
 
@@ -35,7 +35,7 @@ YEAR_SEQUENCE_PATTERN = re.compile(r"INC-(\d{4})-(\d+)")
 
 async def _get_next_incident_number(db: AsyncSession) -> str:
     """INC-YYYY-NNNNNN形式のインシデント番号を生成"""
-    year = datetime.now(timezone.utc).year
+    year = datetime.now(UTC).year
     result = await db.execute(select(func.nextval("incident_seq")))
     seq = result.scalar_one()
     return f"INC-{year}-{seq:06d}"
@@ -52,7 +52,7 @@ def _calculate_sla_deadlines(priority: str, created_at: datetime) -> dict[str, d
 
 async def create_incident(db: AsyncSession, data: dict[str, Any]) -> Incident:
     """インシデントを作成し、SLAタイマーを設定する"""
-    created_at = datetime.now(timezone.utc)
+    created_at = datetime.now(UTC)
     incident_number = await _get_next_incident_number(db)
     sla_deadlines = _calculate_sla_deadlines(data.get("priority", "P4"), created_at)
 
@@ -80,13 +80,13 @@ async def transition_status(
             f"許可される遷移: {', '.join(allowed) or 'なし'}"
         )
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     incident.status = new_status
 
     def _aware(dt: datetime | None) -> datetime | None:
         """SQLiteでtimezone情報が失われた場合にUTCとして補完する"""
         if dt is not None and dt.tzinfo is None:
-            return dt.replace(tzinfo=timezone.utc)
+            return dt.replace(tzinfo=UTC)
         return dt
 
     if new_status == "Acknowledged" and incident.acknowledged_at is None:

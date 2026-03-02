@@ -1,6 +1,6 @@
 """Redis キャッシュユーティリティ"""
-import structlog
 import redis.asyncio as aioredis
+import structlog
 
 from src.core.config import settings
 

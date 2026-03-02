@@ -49,7 +49,11 @@ async def process_issues_event(db: AsyncSession, payload: dict) -> dict | None:
             "status": "open",
             "reported_by": "github-webhook",
         })
-        logger.info("github_issue_incident_created", issue_number=issue_number, incident_id=str(incident.id))
+        logger.info(
+            "github_issue_incident_created",
+            issue_number=issue_number,
+            incident_id=str(incident.id),
+        )
         return {"incident_id": str(incident.id), "incident_number": incident.incident_number}
 
     if action == "closed":

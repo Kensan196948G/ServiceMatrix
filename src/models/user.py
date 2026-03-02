@@ -1,6 +1,6 @@
 """ユーザー・チーム・ロールモデル"""
-import uuid
 import enum
+import uuid
 from datetime import datetime
 
 from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, String, Text
@@ -10,7 +10,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from src.models.base import Base, TimestampMixin
 
 
-class UserRole(str, enum.Enum):
+class UserRole(enum.StrEnum):
     SYSTEM_ADMIN = "SystemAdmin"
     SERVICE_MANAGER = "ServiceManager"
     CHANGE_MANAGER = "ChangeManager"

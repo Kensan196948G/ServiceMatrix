@@ -1,13 +1,12 @@
 """問題管理ビジネスロジック - Known Error DB・ステータス遷移"""
-import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.models.problem import Problem
 from src.core.logging import get_logger
+from src.models.problem import Problem
 
 logger = get_logger(__name__)
 
@@ -23,7 +22,7 @@ VALID_PROBLEM_TRANSITIONS: dict[str, set[str]] = {
 
 async def _get_next_problem_number(db: AsyncSession) -> str:
     """PRB-YYYY-NNNNNN形式の問題番号を生成"""
-    year = datetime.now(timezone.utc).year
+    year = datetime.now(UTC).year
     result = await db.execute(select(func.nextval("problem_seq")))
     seq = result.scalar_one()
     return f"PRB-{year}-{seq:06d}"
@@ -34,7 +33,7 @@ async def create_problem(db: AsyncSession, data: dict[str, Any]) -> Problem:
     problem_number = await _get_next_problem_number(db)
     problem = Problem(
         problem_number=problem_number,
-        created_at=datetime.now(timezone.utc),
+        created_at=datetime.now(UTC),
         **{k: v for k, v in data.items() if k not in ("created_at",)},
     )
     db.add(problem)
@@ -55,14 +54,16 @@ async def transition_problem_status(
             f"許可される遷移: {', '.join(allowed) or 'なし'}"
         )
     problem.status = new_status
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     if new_status == "Resolved":
         problem.resolved_at = now
     elif new_status == "Closed":
         problem.closed_at = now
     await db.flush()
     await db.refresh(problem)
-    logger.info("problem_status_changed", problem_number=problem.problem_number, new_status=new_status)
+    logger.info(
+        "problem_status_changed", problem_number=problem.problem_number, new_status=new_status
+    )
     return problem
 
 

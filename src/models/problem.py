@@ -33,7 +33,7 @@ class Problem(Base, TimestampMixin):
 
     # Known Error DB
     known_error: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    workaround: Mapped[str | None] = mapped_column(Text)  # known_error=trueなら必須（アプリ層で検証）
+    workaround: Mapped[str | None] = mapped_column(Text)  # known_error=true時は必須
 
     # 担当者
     assigned_to: Mapped[uuid.UUID | None] = mapped_column(
@@ -44,6 +44,6 @@ class Problem(Base, TimestampMixin):
     resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
-    assignee: Mapped["User | None"] = relationship(
+    assignee: Mapped["User | None"] = relationship(  # noqa: F821
         "User", foreign_keys=[assigned_to], lazy="select"
     )

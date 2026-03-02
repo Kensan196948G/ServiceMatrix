@@ -2,7 +2,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, Integer, JSON, String, Text
+from sqlalchemy import JSON, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -53,7 +53,7 @@ class AuditLog(Base):
     current_hash: Mapped[str] = mapped_column(String(64), nullable=False)
     sequence_number: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
 
-    actor: Mapped["User | None"] = relationship(
+    actor: Mapped["User | None"] = relationship(  # noqa: F821
         "User", foreign_keys=[user_id], lazy="select"
     )
 

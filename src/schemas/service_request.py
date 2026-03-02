@@ -1,6 +1,7 @@
 """サービスリクエスト管理Pydanticスキーマ"""
 import uuid
 from datetime import datetime
+
 from pydantic import BaseModel, Field
 
 VALID_SR_TRANSITIONS: dict[str, set[str]] = {

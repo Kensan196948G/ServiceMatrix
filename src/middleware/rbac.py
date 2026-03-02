@@ -4,8 +4,8 @@ from typing import Annotated
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.cache import is_token_blacklisted
 from src.core.database import get_db
@@ -41,8 +41,8 @@ async def get_current_user(
         user_id: str | None = payload.get("sub")
         if user_id is None:
             raise credentials_exception
-    except ValueError:
-        raise credentials_exception
+    except ValueError as exc:
+        raise credentials_exception from exc
 
     if await is_token_blacklisted(token):
         raise credentials_exception
@@ -64,7 +64,10 @@ def require_role(*allowed_roles: UserRole):
         if user_level < required_level and current_user.role not in allowed_roles:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"この操作には {', '.join(r.value for r in allowed_roles)} 以上のロールが必要です",
+                detail=(
+                    f"この操作には {', '.join(r.value for r in allowed_roles)}"
+                    " 以上のロールが必要です"
+                ),
             )
         return current_user
     return role_checker

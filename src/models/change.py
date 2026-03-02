@@ -1,23 +1,30 @@
 """変更管理モデル（月次パーティション対応）"""
-import uuid
 import enum
+import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, CheckConstraint, DateTime, Enum, ForeignKey, Integer, Numeric, String, Text
+from sqlalchemy import (
+    CheckConstraint,
+    DateTime,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+)
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.models.base import Base, TimestampMixin
 
 
-class ChangeType(str, enum.Enum):
+class ChangeType(enum.StrEnum):
     STANDARD = "Standard"
     NORMAL = "Normal"
     EMERGENCY = "Emergency"
     MAJOR = "Major"
 
 
-class ChangeStatus(str, enum.Enum):
+class ChangeStatus(enum.StrEnum):
     DRAFT = "Draft"
     SUBMITTED = "Submitted"
     CAB_REVIEW = "CAB_Review"
@@ -92,12 +99,12 @@ class Change(Base, TimestampMixin):
     cab_notes: Mapped[str | None] = mapped_column(Text)
 
     # リレーション
-    requester: Mapped["User | None"] = relationship(
+    requester: Mapped["User | None"] = relationship(  # noqa: F821
         "User", foreign_keys=[requested_by], lazy="select"
     )
-    assignee: Mapped["User | None"] = relationship(
+    assignee: Mapped["User | None"] = relationship(  # noqa: F821
         "User", foreign_keys=[assigned_to], lazy="select"
     )
-    cab_approver: Mapped["User | None"] = relationship(
+    cab_approver: Mapped["User | None"] = relationship(  # noqa: F821
         "User", foreign_keys=[cab_approved_by], lazy="select"
     )

@@ -3,8 +3,8 @@ import uuid
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.database import get_db
 from src.middleware.rbac import get_current_user, require_role
@@ -12,8 +12,11 @@ from src.models.problem import Problem
 from src.models.user import User, UserRole
 from src.schemas.common import PaginatedResponse
 from src.schemas.problem import (
-    KnownErrorUpdate, ProblemCreate, ProblemResponse,
-    ProblemStatusTransition, ProblemUpdate
+    KnownErrorUpdate,
+    ProblemCreate,
+    ProblemResponse,
+    ProblemStatusTransition,
+    ProblemUpdate,
 )
 from src.services import problem_service
 

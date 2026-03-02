@@ -1,5 +1,6 @@
 """アプリケーション設定 - Pydantic Settings"""
 from functools import lru_cache
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -24,7 +25,7 @@ class Settings(BaseSettings):
     redis_url: str = "redis://localhost:6379/0"
 
     # JWT認証
-    secret_key: str = "change-this-in-production"
+    secret_key: str = "change-this-in-production"  # noqa: S105
     access_token_expire_minutes: int = 30
     refresh_token_expire_days: int = 7
     jwt_algorithm: str = "HS256"

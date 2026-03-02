@@ -84,7 +84,9 @@ async def get_incident(
     )
     incident = result.scalar_one_or_none()
     if not incident:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="インシデントが見つかりません")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="インシデントが見つかりません"
+        )
     return incident
 
 
@@ -103,7 +105,9 @@ async def update_incident(
     result = await db.execute(select(Incident).where(Incident.incident_id == incident_id))
     incident = result.scalar_one_or_none()
     if not incident:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="インシデントが見つかりません")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="インシデントが見つかりません"
+        )
 
     for field, value in data.model_dump(exclude_none=True).items():
         setattr(incident, field, value)
@@ -128,7 +132,9 @@ async def transition_incident_status(
     result = await db.execute(select(Incident).where(Incident.incident_id == incident_id))
     incident = result.scalar_one_or_none()
     if not incident:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="インシデントが見つかりません")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="インシデントが見つかりません"
+        )
 
     try:
         incident = await incident_service.transition_status(

@@ -1,6 +1,7 @@
 """問題管理Pydanticスキーマ"""
 import uuid
 from datetime import datetime
+
 from pydantic import BaseModel, Field
 
 

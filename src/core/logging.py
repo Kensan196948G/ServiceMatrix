@@ -1,6 +1,8 @@
 """構造化ログ設定 - structlog"""
 import logging
+
 import structlog
+
 from src.core.config import settings
 
 

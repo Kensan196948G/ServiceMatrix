@@ -1,13 +1,13 @@
 """J-SOX準拠 SHA-256ハッシュチェーン監査サービス"""
 import hashlib
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.models.audit import AuditLog
 from src.core.logging import get_logger
+from src.models.audit import AuditLog
 
 logger = get_logger(__name__)
 
@@ -51,7 +51,7 @@ async def record_audit_log(
     new_values: dict | None = None,
 ) -> AuditLog:
     """監査ログを記録（SHA-256ハッシュチェーン付き）"""
-    created_at = datetime.now(timezone.utc)
+    created_at = datetime.now(UTC)
     sequence_number = await get_next_sequence(db)
     prev_hash = await get_last_hash(db)
 
@@ -88,7 +88,9 @@ async def record_audit_log(
     return audit_log
 
 
-async def verify_hash_chain(db: AsyncSession, start_seq: int, end_seq: int) -> tuple[bool, int | None]:
+async def verify_hash_chain(
+    db: AsyncSession, start_seq: int, end_seq: int
+) -> tuple[bool, int | None]:
     """ハッシュチェーン整合性検証"""
     result = await db.execute(
         select(AuditLog)

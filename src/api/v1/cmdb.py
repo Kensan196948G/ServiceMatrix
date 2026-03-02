@@ -78,7 +78,11 @@ async def get_ci_relationships(
     return await cmdb_service.get_ci_relationships(db, ci_id)
 
 
-@router.post("/relationships", response_model=CIRelationshipResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/relationships",
+    response_model=CIRelationshipResponse,
+    status_code=status.HTTP_201_CREATED,
+)
 async def create_ci_relationship(
     data: CIRelationshipCreate,
     db: Annotated[AsyncSession, Depends(get_db)],
