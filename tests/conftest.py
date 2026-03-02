@@ -52,3 +52,36 @@ async def client(db_session: AsyncSession):
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         yield ac
     app.dependency_overrides.clear()
+
+
+# ─── API統合テスト用フィクスチャ ────────────────────────────────────────────
+
+@pytest_asyncio.fixture
+async def authed_user(db_session):
+    """テスト用 SystemAdmin ユーザー（uuid4()でSQLite UUID整合性を保持）"""
+    from datetime import datetime, timezone
+    import uuid as _uuid
+    from src.models.user import User, UserRole
+
+    now = datetime.now(timezone.utc)
+    user = User(
+        user_id=_uuid.uuid4(),
+        username="test_admin",
+        email="admin@test.com",
+        hashed_password="fakehash",
+        role=UserRole.SYSTEM_ADMIN,
+        is_active=True,
+        created_at=now,
+        updated_at=now,
+    )
+    db_session.add(user)
+    await db_session.flush()
+    return user
+
+
+@pytest_asyncio.fixture
+async def auth_headers(authed_user):
+    """SystemAdmin JWT Bearer ヘッダー"""
+    from src.core.security import create_access_token
+    token = create_access_token({"sub": str(authed_user.user_id), "role": "SystemAdmin"})
+    return {"Authorization": f"Bearer {token}"}
