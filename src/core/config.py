@@ -45,6 +45,12 @@ class Settings(BaseSettings):
     openai_api_key: str = ""  # noqa: S105
     openai_api_base: str = ""  # Azure OpenAIのエンドポイントまたはOllamaのURL
 
+    # アラート・通知設定
+    github_token: str = ""  # noqa: S105
+    github_repo: str = ""
+    alert_webhook_url: str = ""
+    alert_webhook_enabled: bool = False
+
 
 @lru_cache
 def get_settings() -> Settings:
