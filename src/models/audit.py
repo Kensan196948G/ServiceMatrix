@@ -2,8 +2,8 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, Text
-from sqlalchemy.dialects.postgresql import UUID, JSONB
+from sqlalchemy import DateTime, ForeignKey, Integer, JSON, String, Text
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.models.base import Base
@@ -39,14 +39,14 @@ class AuditLog(Base):
     # リクエスト情報
     http_method: Mapped[str | None] = mapped_column(String(10))
     request_path: Mapped[str | None] = mapped_column(String(500))
-    request_body: Mapped[dict | None] = mapped_column(JSONB)
+    request_body: Mapped[dict | None] = mapped_column(JSON)
     response_status: Mapped[int | None] = mapped_column(Integer)
     ip_address: Mapped[str | None] = mapped_column(String(45))
     user_agent: Mapped[str | None] = mapped_column(String(500))
 
     # 変更差分
-    old_values: Mapped[dict | None] = mapped_column(JSONB)
-    new_values: Mapped[dict | None] = mapped_column(JSONB)
+    old_values: Mapped[dict | None] = mapped_column(JSON)
+    new_values: Mapped[dict | None] = mapped_column(JSON)
 
     # J-SOX SHA-256ハッシュチェーン
     prev_log_hash: Mapped[str | None] = mapped_column(String(64))
@@ -79,8 +79,8 @@ class AIAuditLog(Base):
 
     # 判断内容
     decision_type: Mapped[str] = mapped_column(String(100), nullable=False)
-    decision_input: Mapped[dict | None] = mapped_column(JSONB)
-    decision_output: Mapped[dict | None] = mapped_column(JSONB)
+    decision_input: Mapped[dict | None] = mapped_column(JSON)
+    decision_output: Mapped[dict | None] = mapped_column(JSON)
     confidence_score: Mapped[float | None] = mapped_column()
 
     # 人間承認

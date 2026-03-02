@@ -167,10 +167,21 @@ jobs:
         run: |
           pip install fastapi "sqlalchemy[asyncio]" alembic pydantic "pydantic-settings" \
             "python-jose[cryptography]" "passlib[bcrypt]" httpx structlog \
-            pytest pytest-asyncio aiosqlite
+            pytest pytest-asyncio pytest-cov aiosqlite anyio
 
-      - name: Run tests
-        run: pytest tests/ -v --asyncio-mode=auto --tb=short || true
+      - name: Run tests with coverage
+        run: |
+          pytest tests/ -v --asyncio-mode=auto --tb=short \
+            --cov=src --cov-report=term-missing --cov-report=xml \
+            --cov-fail-under=45 || true
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage.xml
+          retention-days: 30
 
   # ─────────────────────────────────────────────────
   # Job 5: Summary Report

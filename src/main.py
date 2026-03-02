@@ -8,12 +8,15 @@ from src.core.config import settings
 from src.core.logging import setup_logging
 from src.api.v1.router import api_router
 from src.middleware.audit import AuditMiddleware
+from src.services.sla_monitor_service import sla_monitor
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     setup_logging()
+    await sla_monitor.start()
     yield
+    await sla_monitor.stop()
 
 
 def create_app() -> FastAPI:

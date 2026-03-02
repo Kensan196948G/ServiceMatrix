@@ -1,8 +1,8 @@
 """CMDB（構成管理データベース）モデル"""
 import uuid
 
-from sqlalchemy import CheckConstraint, ForeignKey, String, Text
-from sqlalchemy.dialects.postgresql import UUID, JSONB
+from sqlalchemy import CheckConstraint, ForeignKey, JSON, String, Text
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.models.base import Base, TimestampMixin
@@ -30,7 +30,7 @@ class ConfigurationItem(Base, TimestampMixin):
         UUID(as_uuid=True), ForeignKey("users.user_id"), nullable=True
     )
     description: Mapped[str | None] = mapped_column(Text)
-    attributes: Mapped[dict | None] = mapped_column(JSONB)
+    attributes: Mapped[dict | None] = mapped_column(JSON)
 
     owner: Mapped["User | None"] = relationship(
         "User", foreign_keys=[owner_id], lazy="select"

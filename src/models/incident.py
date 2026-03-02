@@ -82,6 +82,7 @@ class Incident(Base, TimestampMixin):
     sla_response_due_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     sla_resolution_due_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     sla_breached: Mapped[bool] = mapped_column(default=False, nullable=False)
+    sla_breached_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     # カテゴリー・タグ
     category: Mapped[str | None] = mapped_column(String(100))

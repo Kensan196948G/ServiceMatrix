@@ -75,3 +75,4 @@ temp/
 
 # Claude Code
 .claude/
+coverage.xml
