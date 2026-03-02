@@ -35,6 +35,9 @@ class Settings(BaseSettings):
     # 監査ログ
     audit_log_retention_years: int = 7
 
+    # GitHub Webhook
+    github_webhook_secret: str = ""
+
 
 @lru_cache
 def get_settings() -> Settings:
