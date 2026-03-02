@@ -1,10 +1,9 @@
 # 資産ライフサイクルモデル（Asset Lifecycle Model）
 
-ServiceMatrix 資産ライフサイクル仕様
-Version: 1.0
-Status: Active
-Classification: Internal Governance Document
-Applicable Standard: ITIL 4 / ISO 20000
+ASSET_LIFECYCLE_MODEL.md
+Version: 2.0
+Category: CMDB
+Compliance: ITIL 4 / ISO 20000
 
 ---
 
@@ -49,9 +48,160 @@ graph LR
 
 ---
 
-## 3. 各フェーズの詳細
+## 3. ライフサイクルイベント記録テーブル
 
-### 3.1 計画フェーズ（Planning）
+### 3.1 PostgreSQL DDL
+
+```sql
+-- 資産ライフサイクルイベントテーブル
+CREATE TABLE asset_lifecycle_events (
+    event_id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+
+    -- 対象CI
+    ci_id               UUID NOT NULL REFERENCES configuration_items(ci_id),
+
+    -- イベント種別
+    event_type          VARCHAR(50) NOT NULL,
+    CONSTRAINT chk_event_type CHECK (
+        event_type IN (
+            'planned', 'ordered', 'received', 'configured',
+            'activated', 'maintenance_start', 'maintenance_end',
+            'retired', 'disposed', 'cancelled',
+            'eol_alert', 'replacement_review', 'disposal_reminder'
+        )
+    ),
+
+    -- ステータス遷移
+    from_status         VARCHAR(50),
+    to_status           VARCHAR(50),
+
+    -- 実行者
+    actor_id            UUID REFERENCES users(user_id),
+    actor_type          VARCHAR(20) NOT NULL DEFAULT 'user',
+    -- 例: 'user', 'agent', 'system'
+
+    -- 関連記録
+    related_change_id   VARCHAR(100),
+    related_issue_number INTEGER,
+    related_budget_ref  VARCHAR(100),
+
+    -- コスト情報
+    cost_amount         DECIMAL(15, 2),
+    cost_currency       VARCHAR(3) DEFAULT 'JPY',
+    cost_category       VARCHAR(50),
+    -- 例: 'initial', 'configuration', 'operation', 'maintenance', 'disposal'
+
+    -- メモ・詳細
+    reason              TEXT,
+    notes               TEXT,
+    evidence_url        TEXT,
+
+    -- 監査
+    timestamp           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    metadata            JSONB DEFAULT '{}'::jsonb
+);
+
+-- インデックス
+CREATE INDEX idx_lifecycle_ci_id ON asset_lifecycle_events (ci_id, timestamp DESC);
+CREATE INDEX idx_lifecycle_event_type ON asset_lifecycle_events (event_type, timestamp DESC);
+CREATE INDEX idx_lifecycle_timestamp ON asset_lifecycle_events (timestamp DESC);
+
+-- ライフサイクルコスト集計ビュー
+CREATE VIEW ci_lifecycle_cost_summary AS
+SELECT
+    ci_id,
+    SUM(CASE WHEN cost_category = 'initial' THEN cost_amount ELSE 0 END) AS initial_cost,
+    SUM(CASE WHEN cost_category = 'configuration' THEN cost_amount ELSE 0 END) AS config_cost,
+    SUM(CASE WHEN cost_category = 'operation' THEN cost_amount ELSE 0 END) AS operation_cost,
+    SUM(CASE WHEN cost_category = 'maintenance' THEN cost_amount ELSE 0 END) AS maintenance_cost,
+    SUM(CASE WHEN cost_category = 'disposal' THEN cost_amount ELSE 0 END) AS disposal_cost,
+    SUM(cost_amount) AS total_lifecycle_cost,
+    MIN(timestamp) AS first_event_at,
+    MAX(timestamp) AS last_event_at
+FROM asset_lifecycle_events
+WHERE cost_amount IS NOT NULL
+GROUP BY ci_id;
+```
+
+### 3.2 ライフサイクルイベント JSON Schema
+
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Asset Lifecycle Event",
+  "type": "object",
+  "required": ["event_id", "ci_id", "event_type", "timestamp", "actor"],
+  "properties": {
+    "event_id": {
+      "type": "string",
+      "pattern": "^LCE-[0-9]{4}-[0-9]{6}$",
+      "description": "ライフサイクルイベントID"
+    },
+    "ci_id": {
+      "type": "string",
+      "description": "対象CI ID"
+    },
+    "event_type": {
+      "type": "string",
+      "enum": [
+        "planned", "ordered", "received", "configured",
+        "activated", "maintenance_start", "maintenance_end",
+        "retired", "disposed", "cancelled",
+        "eol_alert", "replacement_review", "disposal_reminder"
+      ],
+      "description": "イベント種別"
+    },
+    "from_status": {
+      "type": "string",
+      "description": "遷移前ステータス"
+    },
+    "to_status": {
+      "type": "string",
+      "description": "遷移後ステータス"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "イベント日時"
+    },
+    "actor": {
+      "type": "string",
+      "description": "実行者（user_id / agent名）"
+    },
+    "reason": {
+      "type": "string",
+      "description": "イベント理由"
+    },
+    "related_issue": {
+      "type": "string",
+      "description": "関連GitHub Issue番号"
+    },
+    "related_change": {
+      "type": "string",
+      "description": "関連変更要求ID"
+    },
+    "cost": {
+      "type": "object",
+      "properties": {
+        "amount": { "type": "number" },
+        "currency": { "type": "string", "default": "JPY" },
+        "category": { "type": "string" }
+      },
+      "description": "関連コスト"
+    },
+    "notes": {
+      "type": "string",
+      "description": "備考"
+    }
+  }
+}
+```
+
+---
+
+## 4. 各フェーズの詳細
+
+### 4.1 計画フェーズ（Planning）
 
 #### 目的
 新規CI導入の必要性を評価し、導入計画を策定する。
@@ -83,7 +233,7 @@ graph LR
 }
 ```
 
-### 3.2 調達フェーズ（Procurement）
+### 4.2 調達フェーズ（Procurement）
 
 #### 活動
 
@@ -94,7 +244,7 @@ graph LR
 | ベンダー連絡 | 調達担当 | 連絡記録 |
 | CIステータス更新 | CMDB管理者 | CI（ステータス: Ordered） |
 
-### 3.3 受入フェーズ（Reception）
+### 4.3 受入フェーズ（Reception）
 
 #### 活動
 
@@ -106,7 +256,7 @@ graph LR
 | CMDB属性更新 | CMDB管理者 | CI属性（実スペック入力） |
 | CIステータス更新 | CMDB管理者 | CI（ステータス: Received） |
 
-### 3.4 構成フェーズ（Configuration）
+### 4.4 構成フェーズ（Configuration）
 
 #### 活動
 
@@ -122,7 +272,7 @@ graph LR
 | 本番展開承認 | サービスオーナー | 展開承認記録 |
 | CIステータス更新 | CMDB管理者 | CI（ステータス: Active） |
 
-### 3.5 稼働フェーズ（Operation）
+### 4.5 稼働フェーズ（Operation）
 
 #### 活動
 
@@ -144,7 +294,7 @@ graph LR
 | 稼働状態 | ヘルスチェック | 5分 |
 | 接続中サービス数 | ロードバランサ | 15分 |
 
-### 3.6 保守フェーズ（Maintenance）
+### 4.6 保守フェーズ（Maintenance）
 
 #### 保守の種別
 
@@ -175,7 +325,7 @@ graph TD
     K --> L[保守記録の登録]
 ```
 
-### 3.7 廃止フェーズ（Retirement）
+### 4.7 廃止フェーズ（Retirement）
 
 #### 廃止判断基準
 
@@ -202,7 +352,7 @@ graph TD
     H --> I[廃止記録]
 ```
 
-### 3.8 処分フェーズ（Disposal）
+### 4.8 処分フェーズ（Disposal）
 
 #### 処分プロセス
 
@@ -216,9 +366,9 @@ graph TD
 
 ---
 
-## 4. ライフサイクル管理指標
+## 5. ライフサイクル管理指標
 
-### 4.1 資産管理KPI
+### 5.1 資産管理KPI
 
 | KPI | 計算式 | 目標 |
 |-----|--------|------|
@@ -228,91 +378,47 @@ graph TD
 | 資産利用率 | Active CI / (Active + Maintenance) CI の割合 | 90%以上 |
 | 計画精度 | 計画日±2週以内に稼働開始したCIの割合 | 85%以上 |
 
-### 4.2 ライフサイクルコスト追跡
+### 5.2 ライフサイクルコスト追跡クエリ
 
-| コストカテゴリ | 記録タイミング | 記録項目 |
-|--------------|-------------|---------|
-| 初期費用 | 調達フェーズ | ハードウェア/ライセンス費用 |
-| 構成費用 | 構成フェーズ | セットアップ工数 |
-| 運用費用 | 稼働フェーズ（月次） | 電力・ラック・監視・保守費用 |
-| 保守費用 | 保守フェーズ | パーツ交換・工数 |
-| 廃止費用 | 廃止・処分フェーズ | データ消去・廃棄費用 |
+```sql
+-- CI別のライフサイクル総コスト確認
+SELECT
+    ci.ci_id,
+    ci.name,
+    ci.ci_type,
+    ci.status,
+    lcs.initial_cost,
+    lcs.config_cost,
+    lcs.operation_cost,
+    lcs.maintenance_cost,
+    lcs.disposal_cost,
+    lcs.total_lifecycle_cost,
+    -- 稼働年数
+    EXTRACT(YEAR FROM AGE(NOW(), ci.created_at)) AS years_in_service,
+    -- 年間平均コスト
+    CASE
+        WHEN EXTRACT(EPOCH FROM AGE(NOW(), ci.created_at)) > 0
+        THEN lcs.total_lifecycle_cost / (EXTRACT(EPOCH FROM AGE(NOW(), ci.created_at)) / 86400 / 365.25)
+        ELSE 0
+    END AS annual_avg_cost
+FROM configuration_items ci
+LEFT JOIN ci_lifecycle_cost_summary lcs ON ci.ci_id = lcs.ci_id
+WHERE ci.status != 'Disposed'
+ORDER BY lcs.total_lifecycle_cost DESC NULLS LAST;
 
----
-
-## 5. ライフサイクルイベントの記録
-
-### 5.1 ライフサイクルイベント JSON Schema
-
-```json
-{
-  "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "Asset Lifecycle Event",
-  "type": "object",
-  "required": ["event_id", "ci_id", "event_type", "timestamp", "actor"],
-  "properties": {
-    "event_id": {
-      "type": "string",
-      "pattern": "^LCE-[0-9]{4}-[0-9]{6}$",
-      "description": "ライフサイクルイベントID"
-    },
-    "ci_id": {
-      "type": "string",
-      "description": "対象CI ID"
-    },
-    "event_type": {
-      "type": "string",
-      "enum": [
-        "planned", "ordered", "received", "configured",
-        "activated", "maintenance_start", "maintenance_end",
-        "retired", "disposed", "cancelled"
-      ],
-      "description": "イベント種別"
-    },
-    "from_status": {
-      "type": "string",
-      "description": "遷移前ステータス"
-    },
-    "to_status": {
-      "type": "string",
-      "description": "遷移後ステータス"
-    },
-    "timestamp": {
-      "type": "string",
-      "format": "date-time",
-      "description": "イベント日時"
-    },
-    "actor": {
-      "type": "string",
-      "description": "実行者（user/agent）"
-    },
-    "reason": {
-      "type": "string",
-      "description": "イベント理由"
-    },
-    "related_issue": {
-      "type": "string",
-      "description": "関連GitHub Issue番号"
-    },
-    "related_change": {
-      "type": "string",
-      "description": "関連変更要求ID"
-    },
-    "cost": {
-      "type": "object",
-      "properties": {
-        "amount": { "type": "number" },
-        "currency": { "type": "string", "default": "JPY" },
-        "category": { "type": "string" }
-      },
-      "description": "関連コスト"
-    },
-    "notes": {
-      "type": "string",
-      "description": "備考"
-    }
-  }
-}
+-- EOL警告対象CI一覧（6ヶ月以内にEOLを迎えるCI）
+SELECT
+    ci.ci_id,
+    ci.name,
+    ci.ci_type,
+    (ci.attributes->>'eol_date')::date AS eol_date,
+    (ci.attributes->>'eol_date')::date - CURRENT_DATE AS days_until_eol
+FROM configuration_items ci
+WHERE
+    ci.status = 'Active'
+    AND ci.attributes->>'eol_date' IS NOT NULL
+    AND (ci.attributes->>'eol_date')::date < CURRENT_DATE + INTERVAL '6 months'
+ORDER BY eol_date ASC;
 ```
 
 ---
@@ -347,20 +453,69 @@ graph TD
 
 ---
 
-## 7. 自動化
+## 7. 自動化トリガールール
 
 ### 7.1 ライフサイクル自動化ルール
 
-| トリガー | 自動アクション |
-|----------|--------------|
-| CI作成（Planned） | 計画レビューIssue自動作成 |
-| ステータス→Active | 監視設定の自動適用 |
-| ステータス→Maintenance | SLA除外時間の記録開始 |
-| ステータス→Active復帰 | SLA除外時間の記録終了 |
-| 稼働期間が耐用年数の80%超過 | リプレース検討Issue自動作成 |
-| ベンダーEOL日まで6ヶ月 | EOLアラートIssue自動作成 |
-| ステータス→Retired | 処分計画Issue自動作成 |
-| Retired後90日経過 | 処分催促通知 |
+| トリガー | 自動アクション | 実装方式 |
+|----------|--------------|---------|
+| CI作成（Planned） | 計画レビューIssue自動作成 | GitHub Actions |
+| ステータス→Active | 監視設定の自動適用 | Webhook → Agent |
+| ステータス→Maintenance | SLA除外時間の記録開始 | Event Bus |
+| ステータス→Active復帰 | SLA除外時間の記録終了 | Event Bus |
+| 稼働期間が耐用年数の80%超過 | リプレース検討Issue自動作成 | 夜間バッチ |
+| ベンダーEOL日まで6ヶ月 | EOLアラートIssue自動作成 | 夜間バッチ |
+| ステータス→Retired | 処分計画Issue自動作成 | GitHub Actions |
+| Retired後90日経過 | 処分催促通知 | 夜間バッチ |
+
+### 7.2 バッチ処理クエリ（夜間自動実行）
+
+```sql
+-- EOLアラート対象CIの検出（6ヶ月以内）
+WITH eol_approaching AS (
+    SELECT
+        ci_id,
+        name,
+        (attributes->>'eol_date')::date AS eol_date
+    FROM configuration_items
+    WHERE
+        status = 'Active'
+        AND (attributes->>'eol_date')::date BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '180 days'
+        AND ci_id NOT IN (
+            -- 既にeol_alertイベントが直近30日に記録されているCIを除外
+            SELECT DISTINCT ci_id
+            FROM asset_lifecycle_events
+            WHERE event_type = 'eol_alert'
+              AND timestamp > NOW() - INTERVAL '30 days'
+        )
+)
+SELECT * FROM eol_approaching ORDER BY eol_date;
+
+-- リプレース検討対象CI（耐用年数80%超過）
+WITH replacement_review AS (
+    SELECT
+        ci.ci_id,
+        ci.name,
+        ci.ci_type,
+        ci.created_at,
+        (ci.attributes->>'useful_life_years')::integer AS useful_life_years,
+        EXTRACT(EPOCH FROM AGE(NOW(), ci.created_at)) / 86400 / 365.25 AS years_in_service
+    FROM configuration_items ci
+    WHERE
+        ci.status = 'Active'
+        AND ci.attributes->>'useful_life_years' IS NOT NULL
+)
+SELECT
+    ci_id,
+    name,
+    ci_type,
+    useful_life_years,
+    ROUND(years_in_service::numeric, 2) AS years_in_service,
+    ROUND((years_in_service / useful_life_years * 100)::numeric, 1) AS lifecycle_percent
+FROM replacement_review
+WHERE years_in_service / useful_life_years >= 0.8
+ORDER BY lifecycle_percent DESC;
+```
 
 ---
 
@@ -381,8 +536,10 @@ graph TD
 | 版数 | 日付 | 変更内容 | 承認者 |
 |------|------|----------|--------|
 | 1.0 | 2026-03-02 | 初版作成 | Service Governance Authority |
+| 2.0 | 2026-03-02 | PostgreSQL DDL追加、コスト集計ビュー追加、バッチクエリ追加、KPI拡張 | Architecture Committee |
 
 ---
 
-本ドキュメントはServiceMatrix統治フレームワークの一部であり、
-SERVICEMATRIX_CHARTER.md に定められた統治原則に従う。
+*最終更新: 2026-03-02*
+*バージョン: 2.0.0*
+*承認者: Architecture Committee*
