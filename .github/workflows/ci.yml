@@ -128,6 +128,51 @@ jobs:
         continue-on-error: true
 
   # ─────────────────────────────────────────────────
+  # Job 6: Python Lint (ruff)
+  # ─────────────────────────────────────────────────
+  python-lint:
+    name: Python Lint (ruff)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install ruff
+        run: pip install ruff
+
+      - name: Run ruff
+        run: ruff check src/ tests/ || true
+
+  # ─────────────────────────────────────────────────
+  # Job 7: Python Tests (pytest)
+  # ─────────────────────────────────────────────────
+  python-test:
+    name: Python Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          pip install fastapi "sqlalchemy[asyncio]" alembic pydantic "pydantic-settings" \
+            "python-jose[cryptography]" "passlib[bcrypt]" httpx structlog \
+            pytest pytest-asyncio aiosqlite
+
+      - name: Run tests
+        run: pytest tests/ -v --asyncio-mode=auto --tb=short || true
+
+  # ─────────────────────────────────────────────────
   # Job 5: Summary Report
   # ─────────────────────────────────────────────────
   ci-summary:
@@ -137,6 +182,8 @@ jobs:
       - lint-markdown
       - validate-docs-structure
       - validate-config-files
+      - python-lint
+      - python-test
     if: always()
     steps:
       - name: Checkout
@@ -151,5 +198,7 @@ jobs:
           echo "| Markdown Lint | ${{ needs.lint-markdown.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Docs Structure | ${{ needs.validate-docs-structure.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Config Validation | ${{ needs.validate-config-files.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Python Lint | ${{ needs.python-lint.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Python Tests | ${{ needs.python-test.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "🕐 実行時刻: $(date '+%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
