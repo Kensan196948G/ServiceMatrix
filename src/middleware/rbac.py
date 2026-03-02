@@ -7,6 +7,7 @@ from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
+from src.core.cache import is_token_blacklisted
 from src.core.database import get_db
 from src.core.security import decode_token
 from src.models.user import User, UserRole
@@ -41,6 +42,9 @@ async def get_current_user(
         if user_id is None:
             raise credentials_exception
     except ValueError:
+        raise credentials_exception
+
+    if await is_token_blacklisted(token):
         raise credentials_exception
 
     result = await db.execute(select(User).where(User.user_id == uuid.UUID(user_id)))
