@@ -18,7 +18,9 @@ from src.schemas.problem import (
     ProblemStatusTransition,
     ProblemUpdate,
 )
+from src.schemas.rca import RCAResultSchema
 from src.services import problem_service
+from src.services.rca_service import rca_service
 
 router = APIRouter(prefix="/problems", tags=["problems"])
 
@@ -151,3 +153,19 @@ async def set_known_error(
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e)) from e
     return problem
+
+
+@router.post(
+    "/{problem_id}/analyze",
+    response_model=RCAResultSchema,
+    summary="RCA自動分析",
+    description="根本原因分析を自動実行します。",
+)
+async def analyze_problem_rca(
+    problem_id: uuid.UUID,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+) -> RCAResultSchema:
+    """根本原因分析（RCA）を自動実行し、結果を返す"""
+    rca_result = await rca_service.analyze_problem(db, str(problem_id))
+    return RCAResultSchema(**rca_result.__dict__)
