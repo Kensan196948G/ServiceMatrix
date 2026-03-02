@@ -1,10 +1,9 @@
 # イベントスキーマ（Event Schema）
 
-ServiceMatrix イベントスキーマ仕様
-Version: 1.0
-Status: Active
-Classification: Internal Technical Document
-Applicable Standard: ITIL 4 / ISO 20000
+EVENT_SCHEMA.md
+Version: 2.0
+Category: Data Model
+Compliance: ITIL 4 / ISO 20000
 
 ---
 
@@ -93,9 +92,87 @@ Applicable Standard: ITIL 4 / ISO 20000
 
 ---
 
-## 3. イベントペイロード JSON Schema
+## 3. イベントストアテーブル（PostgreSQL DDL）
 
-### 3.1 基本イベントスキーマ（全イベント共通）
+```sql
+-- イベントストアテーブル
+CREATE TABLE events (
+    event_id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+
+    -- イベント識別（EVT-YYYYMMDD-xxxxxxxx形式）
+    event_number        VARCHAR(30) NOT NULL UNIQUE,
+
+    -- イベント種別
+    event_type          VARCHAR(100) NOT NULL,
+    -- 例: 'incident.created', 'sla.breached', 'ci.updated'
+
+    -- タイムスタンプ
+    timestamp           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+    -- アクター
+    actor_id            VARCHAR(255) NOT NULL,
+    actor_type          VARCHAR(20) NOT NULL DEFAULT 'user',
+    CONSTRAINT chk_actor_type CHECK (
+        actor_type IN ('user', 'agent', 'system', 'webhook')
+    ),
+    actor_name          VARCHAR(255),
+
+    -- 対象リソース
+    resource_type       VARCHAR(50) NOT NULL,
+    CONSTRAINT chk_resource_type CHECK (
+        resource_type IN ('incident', 'change', 'problem', 'request',
+                          'ci', 'sla', 'system', 'user')
+    ),
+    resource_id         VARCHAR(100) NOT NULL,
+
+    -- 変更差分
+    diff                JSONB DEFAULT '{}'::jsonb,
+
+    -- 相関・因果関係
+    correlation_id      VARCHAR(100),
+    parent_event_id     UUID REFERENCES events(event_id),
+
+    -- GitHub連携
+    github_issue_number INTEGER,
+    github_event_type   VARCHAR(100),
+    github_event_action VARCHAR(100),
+    github_sender       VARCHAR(100),
+
+    -- メタデータ
+    tags                TEXT[] DEFAULT ARRAY[]::TEXT[],
+    metadata            JSONB DEFAULT '{}'::jsonb,
+
+    -- 処理状態（イベントバス管理）
+    processed           BOOLEAN NOT NULL DEFAULT FALSE,
+    processed_at        TIMESTAMPTZ,
+    retry_count         SMALLINT NOT NULL DEFAULT 0,
+    last_error          TEXT
+)
+PARTITION BY RANGE (timestamp);
+
+-- 月次パーティション
+CREATE TABLE events_2026_03 PARTITION OF events
+    FOR VALUES FROM ('2026-03-01') TO ('2026-04-01');
+CREATE TABLE events_2026_04 PARTITION OF events
+    FOR VALUES FROM ('2026-04-01') TO ('2026-05-01');
+
+-- インデックス
+CREATE INDEX idx_events_type ON events (event_type, timestamp DESC);
+CREATE INDEX idx_events_resource ON events (resource_type, resource_id, timestamp DESC);
+CREATE INDEX idx_events_correlation ON events (correlation_id) WHERE correlation_id IS NOT NULL;
+CREATE INDEX idx_events_timestamp ON events (timestamp DESC);
+CREATE INDEX idx_events_unprocessed ON events (processed, timestamp)
+    WHERE processed = FALSE;
+
+-- イベントタグGINインデックス
+CREATE INDEX idx_events_tags_gin ON events USING GIN (tags);
+```
+
+---
+
+## 4. イベントペイロード JSON Schema
+
+### 4.1 基本イベントスキーマ（全イベント共通）
 
 ```json
 {
@@ -119,7 +196,7 @@ Applicable Standard: ITIL 4 / ISO 20000
     "timestamp": {
       "type": "string",
       "format": "date-time",
-      "description": "イベント発生日時（ISO 8601 JST）"
+      "description": "イベント発生日時（ISO 8601 UTC）"
     },
     "actor": {
       "type": "object",
@@ -131,8 +208,7 @@ Applicable Standard: ITIL 4 / ISO 20000
         },
         "actor_type": {
           "type": "string",
-          "enum": ["user", "agent", "system", "webhook"],
-          "description": "実行者種別"
+          "enum": ["user", "agent", "system", "webhook"]
         },
         "actor_name": {
           "type": "string",
@@ -142,8 +218,7 @@ Applicable Standard: ITIL 4 / ISO 20000
     },
     "resource_type": {
       "type": "string",
-      "enum": ["incident", "change", "problem", "request", "ci", "sla", "system"],
-      "description": "対象リソース種別"
+      "enum": ["incident", "change", "problem", "request", "ci", "sla", "system", "user"]
     },
     "resource_id": {
       "type": "string",
@@ -164,8 +239,7 @@ Applicable Standard: ITIL 4 / ISO 20000
             "required": ["field", "new_value"]
           }
         }
-      },
-      "description": "変更差分"
+      }
     },
     "metadata": {
       "type": "object",
@@ -177,25 +251,23 @@ Applicable Standard: ITIL 4 / ISO 20000
         "source_ip": { "type": "string" },
         "correlation_id": { "type": "string" },
         "parent_event_id": { "type": "string" }
-      },
-      "description": "イベントメタデータ"
+      }
     },
     "tags": {
       "type": "array",
-      "items": { "type": "string" },
-      "description": "イベントタグ"
+      "items": { "type": "string" }
     }
   }
 }
 ```
 
-### 3.2 インシデント作成イベントの例
+### 4.2 インシデント作成イベントの例
 
 ```json
 {
   "event_id": "EVT-20260302-a1b2c3d4",
   "event_type": "incident.created",
-  "timestamp": "2026-03-02T10:30:00+09:00",
+  "timestamp": "2026-03-02T01:30:00Z",
   "actor": {
     "actor_id": "USR-000042",
     "actor_type": "user",
@@ -222,13 +294,13 @@ Applicable Standard: ITIL 4 / ISO 20000
 }
 ```
 
-### 3.3 SLA違反イベントの例
+### 4.3 SLA違反イベントの例
 
 ```json
 {
   "event_id": "EVT-20260302-e5f6g7h8",
   "event_type": "sla.breached",
-  "timestamp": "2026-03-02T11:30:00+09:00",
+  "timestamp": "2026-03-02T02:30:00Z",
   "actor": {
     "actor_id": "sla-monitor-agent",
     "actor_type": "agent",
@@ -246,7 +318,8 @@ Applicable Standard: ITIL 4 / ISO 20000
   },
   "metadata": {
     "github_issue_number": 42,
-    "correlation_id": "CORR-20260302-xyz789"
+    "correlation_id": "CORR-20260302-xyz789",
+    "parent_event_id": "EVT-20260302-a1b2c3d4"
   },
   "tags": ["sla-breach", "p1", "response-time"]
 }
@@ -254,16 +327,16 @@ Applicable Standard: ITIL 4 / ISO 20000
 
 ---
 
-## 4. GitHub Webhookイベントとの対応マッピング
+## 5. GitHub Webhookイベントとの対応マッピング
 
-### 4.1 Issues イベント
+### 5.1 Issues イベント
 
 | GitHub Webhook Action | ServiceMatrix Event | 条件 |
 |----------------------|---------------------|------|
 | issues.opened | incident.created | ラベル: incident |
 | issues.opened | change.created | ラベル: change |
 | issues.opened | problem.created | ラベル: problem |
-| issues.opened | (request作成) | ラベル: request |
+| issues.opened | request作成 | ラベル: request |
 | issues.assigned | incident.acknowledged | ラベル: incident |
 | issues.labeled | incident.priority_changed | priority/* ラベル変更 |
 | issues.labeled | incident.escalated | escalated ラベル追加 |
@@ -274,25 +347,32 @@ Applicable Standard: ITIL 4 / ISO 20000
 | issues.closed | problem.resolved | ラベル: problem |
 | issues.reopened | incident.reopened | ラベル: incident |
 
-### 4.2 Issue Comment イベント
+### 5.2 Issue Comment イベント
 
 | GitHub Webhook Action | ServiceMatrix Event | 条件 |
 |----------------------|---------------------|------|
 | issue_comment.created | incident.updated | ラベル: incident |
 | issue_comment.created | incident.acknowledged | 初回コメント（incidentラベル） |
 
-### 4.3 Pull Request イベント
+### 5.3 Pull Request イベント
 
 | GitHub Webhook Action | ServiceMatrix Event | 条件 |
 |----------------------|---------------------|------|
 | pull_request.merged | change.completed | 関連changeIssueリンクあり |
 | pull_request.closed (not merged) | change.rejected | 関連changeIssueリンクあり |
 
+### 5.4 GitHub Actionsイベント（CI/CD）
+
+| GitHub Actions イベント | ServiceMatrix Event | 条件 |
+|------------------------|---------------------|------|
+| workflow_run.completed (success) | change.completed | deployワークフロー成功 |
+| workflow_run.completed (failure) | change.failed | deployワークフロー失敗 |
+
 ---
 
-## 5. イベント配信
+## 6. イベント配信
 
-### 5.1 イベントバスアーキテクチャ
+### 6.1 イベントバスアーキテクチャ
 
 ```mermaid
 graph LR
@@ -328,7 +408,7 @@ graph LR
     EB --> C6
 ```
 
-### 5.2 イベント配信保証
+### 6.2 イベント配信保証
 
 | 特性 | 方針 |
 |------|------|
@@ -337,22 +417,32 @@ graph LR
 | 冪等性 | コンシューマーはevent_idによる重複排除を実装 |
 | 再配信 | 処理失敗時は最大3回リトライ（指数バックオフ） |
 
-### 5.3 イベントフィルタリング
+### 6.3 未処理イベント監視クエリ
 
-コンシューマーは以下の条件でイベントをフィルタリングできる。
+```sql
+-- 未処理イベントの状況確認
+SELECT
+    event_type,
+    COUNT(*) AS unprocessed_count,
+    MIN(timestamp) AS oldest_event,
+    MAX(retry_count) AS max_retries
+FROM events
+WHERE processed = FALSE
+GROUP BY event_type
+ORDER BY oldest_event ASC;
 
-| フィルタ条件 | 用途例 |
-|-------------|--------|
-| event_type | SLA Calculatorは `incident.*` と `sla.*` のみ受信 |
-| resource_type | CMDB Managerは `ci` リソースのみ受信 |
-| actor.actor_type | 監査ログは全イベントを受信 |
-| tags | P1タグのイベントのみ即時通知 |
+-- 3回以上リトライされているイベント（要調査）
+SELECT event_id, event_type, timestamp, retry_count, last_error
+FROM events
+WHERE processed = FALSE AND retry_count >= 3
+ORDER BY timestamp ASC;
+```
 
 ---
 
-## 6. イベントの相関（Correlation）
+## 7. イベントの相関（Correlation）
 
-### 6.1 相関ID（Correlation ID）
+### 7.1 相関ID（Correlation ID）
 
 同一のビジネストランザクションに属するイベント群を
 correlation_id で紐付ける。
@@ -369,7 +459,23 @@ incident.resolved   (correlation_id: CORR-20260302-xyz789)
 incident.closed     (correlation_id: CORR-20260302-xyz789)
 ```
 
-### 6.2 親子イベント
+### 7.2 相関クエリ
+
+```sql
+-- 特定インシデントに関連するすべてのイベントを時系列で表示
+SELECT
+    event_id,
+    event_type,
+    timestamp,
+    actor_id,
+    actor_type,
+    parent_event_id
+FROM events
+WHERE correlation_id = 'CORR-20260302-xyz789'
+ORDER BY timestamp ASC;
+```
+
+### 7.3 親子イベント
 
 イベントが別のイベントをトリガーした場合、
 parent_event_id で因果関係を記録する。
@@ -378,24 +484,43 @@ parent_event_id で因果関係を記録する。
 incident.created (event_id: EVT-001)
   └── sla.at_risk (event_id: EVT-002, parent_event_id: EVT-001)
        └── sla.breached (event_id: EVT-003, parent_event_id: EVT-002)
+            └── incident.escalated (event_id: EVT-004, parent_event_id: EVT-003)
 ```
 
 ---
 
-## 7. イベント保管
+## 8. イベント保管
 
-### 7.1 保管ポリシー
+### 8.1 保管ポリシー
 
 | データ種別 | 保持期間 | 保管場所 |
 |-----------|---------|---------|
-| 生イベント | 90日 | イベントストア |
-| 集約イベント | 1年 | アーカイブストア |
-| SLA関連イベント | 7年 | 長期保管（監査要件） |
-| 監査対象イベント | 7年 | 長期保管（監査要件） |
+| 生イベント | 90日 | PostgreSQL（Hot） |
+| 集約イベント | 1年 | オブジェクトストレージ（Warm） |
+| SLA関連イベント | 7年 | 長期保管（Cold・J-SOX要件） |
+| 監査対象イベント | 7年 | 長期保管（Cold・J-SOX要件） |
+
+### 8.2 アーカイブ対象選定クエリ
+
+```sql
+-- 90日以上経過した処理済みイベントを特定
+SELECT
+    date_trunc('month', timestamp) AS event_month,
+    COUNT(*) AS event_count,
+    pg_size_pretty(SUM(pg_column_size(metadata))) AS approx_size
+FROM events
+WHERE
+    processed = TRUE
+    AND timestamp < NOW() - INTERVAL '90 days'
+    AND 'sla-breach' != ALL(tags)
+    AND 'j-sox' != ALL(tags)
+GROUP BY date_trunc('month', timestamp)
+ORDER BY event_month;
+```
 
 ---
 
-## 8. 関連ドキュメント
+## 9. 関連ドキュメント
 
 | ドキュメント | 参照先 |
 |-------------|--------|
@@ -407,13 +532,15 @@ incident.created (event_id: EVT-001)
 
 ---
 
-## 9. 改定履歴
+## 10. 改定履歴
 
 | 版数 | 日付 | 変更内容 | 承認者 |
 |------|------|----------|--------|
 | 1.0 | 2026-03-02 | 初版作成 | Service Governance Authority |
+| 2.0 | 2026-03-02 | PostgreSQL DDL追加（eventsテーブル）、GitHub Actions連携追加、相関クエリ追加、アーカイブクエリ追加 | Architecture Committee |
 
 ---
 
-本ドキュメントはServiceMatrix統治フレームワークの一部であり、
-SERVICEMATRIX_CHARTER.md に定められた統治原則に従う。
+*最終更新: 2026-03-02*
+*バージョン: 2.0.0*
+*承認者: Architecture Committee*
