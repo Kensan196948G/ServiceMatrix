@@ -44,11 +44,11 @@ class ProblemResponse(BaseModel):
     known_error: bool
     workaround: str | None
     assigned_to: uuid.UUID | None
-    reported_by: uuid.UUID | None
+    reported_by: uuid.UUID | None = None
     resolved_at: datetime | None
     closed_at: datetime | None
-    category: str | None
-    affected_service: str | None
+    category: str | None = None
+    affected_service: str | None = None
     created_at: datetime
     updated_at: datetime
 

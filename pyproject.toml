@@ -43,7 +43,7 @@ ignore = ["S101", "B008"]
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
-addopts = "--cov=src --cov-report=term-missing --cov-report=xml --cov-fail-under=45"
+addopts = "--cov=src --cov-report=term-missing --cov-report=xml --cov-fail-under=65"
 
 [tool.coverage.run]
 source = ["src"]
