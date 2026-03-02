@@ -60,8 +60,10 @@ class CIRelationship(Base, TimestampMixin):
     description: Mapped[str | None] = mapped_column(Text)
 
     source_ci: Mapped["ConfigurationItem"] = relationship(
-        "ConfigurationItem", foreign_keys=[source_ci_id], lazy="select"
+        "ConfigurationItem", foreign_keys=[source_ci_id], lazy="select",
+        overlaps="outgoing_relationships",
     )
     target_ci: Mapped["ConfigurationItem"] = relationship(
-        "ConfigurationItem", foreign_keys=[target_ci_id], lazy="select"
+        "ConfigurationItem", foreign_keys=[target_ci_id], lazy="select",
+        overlaps="incoming_relationships",
     )

@@ -43,7 +43,11 @@ ignore = ["S101", "B008"]
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
-addopts = "--cov=src --cov-report=term-missing --cov-report=xml --cov-fail-under=67"
+addopts = "--cov=src --cov-report=term-missing --cov-report=xml --cov-fail-under=70"
+filterwarnings = [
+    "ignore::DeprecationWarning:passlib.*",
+    "ignore::DeprecationWarning:fastapi.*",
+]
 
 [tool.coverage.run]
 source = ["src"]

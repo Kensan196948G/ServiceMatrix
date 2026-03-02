@@ -71,7 +71,9 @@ def test_sla_monitor_singleton():
 async def test_sla_p1_breach_detection(db: AsyncSession):
     """P1インシデントでdeadlineが過ぎた場合にsla_breached=Trueになること"""
     past_deadline = datetime.now(UTC) - timedelta(minutes=5)
-    incident = _make_incident(priority="P1", status="In_Progress", sla_resolution_due_at=past_deadline)
+    incident = _make_incident(
+        priority="P1", status="In_Progress", sla_resolution_due_at=past_deadline
+    )
     db.add(incident)
     await db.flush()
 
@@ -87,7 +89,9 @@ async def test_sla_p1_breach_detection(db: AsyncSession):
 async def test_sla_not_breached_when_active(db: AsyncSession):
     """deadline未到来のインシデントはsla_breached=Falseのまま"""
     future_deadline = datetime.now(UTC) + timedelta(hours=2)
-    incident = _make_incident(priority="P2", status="In_Progress", sla_resolution_due_at=future_deadline)
+    incident = _make_incident(
+        priority="P2", status="In_Progress", sla_resolution_due_at=future_deadline
+    )
     db.add(incident)
     await db.flush()
 
@@ -149,7 +153,9 @@ async def test_sla_summary_structure(db: AsyncSession):
 async def test_sla_compliance_rate_100(db: AsyncSession):
     """違反なしの場合compliance_rateが100.0になること"""
     future = datetime.now(UTC) + timedelta(hours=10)
-    incident = _make_incident(priority="P4", status="New", sla_resolution_due_at=future, sla_breached=False)
+    incident = _make_incident(
+        priority="P4", status="New", sla_resolution_due_at=future, sla_breached=False
+    )
     db.add(incident)
     await db.flush()
 
@@ -167,7 +173,9 @@ async def test_sla_compliance_rate_100(db: AsyncSession):
 async def test_sla_breach_timestamp_set(db: AsyncSession):
     """違反検知時にsla_breached_atが設定されること"""
     past_deadline = datetime.now(UTC) - timedelta(minutes=10)
-    incident = _make_incident(priority="P1", status="Acknowledged", sla_resolution_due_at=past_deadline)
+    incident = _make_incident(
+        priority="P1", status="Acknowledged", sla_resolution_due_at=past_deadline
+    )
     db.add(incident)
     await db.flush()
 
@@ -178,3 +186,74 @@ async def test_sla_breach_timestamp_set(db: AsyncSession):
     assert incident.sla_breached is True
     assert incident.sla_breached_at is not None
     assert isinstance(incident.sla_breached_at, datetime)
+
+
+@pytest.mark.asyncio
+async def test_sla_monitor_start_stop():
+    """start/stopメソッドが正常に動作すること"""
+    service = SLAMonitorService()
+    assert service.running is False
+    assert service._task is None
+
+    await service.start()
+    assert service.running is True
+    assert service._task is not None
+
+    await service.stop()
+    assert service.running is False
+
+
+@pytest.mark.asyncio
+async def test_sla_monitor_stop_without_task():
+    """タスクなしでstopが呼ばれても正常に終了すること"""
+    service = SLAMonitorService()
+    service.running = True
+    service._task = None
+
+    await service.stop()
+    assert service.running is False
+
+
+@pytest.mark.asyncio
+async def test_sla_breach_audit_exception_handled(db: AsyncSession):
+    """audit_service例外発生時も処理が継続すること"""
+    past_deadline = datetime.now(UTC) - timedelta(minutes=5)
+    incident = _make_incident(
+        priority="P2", status="In_Progress", sla_resolution_due_at=past_deadline
+    )
+    db.add(incident)
+    await db.flush()
+
+    service = SLAMonitorService()
+    with patch(
+        "src.services.sla_monitor_service.audit_service.record_audit_log",
+        new=AsyncMock(side_effect=Exception("audit failed")),
+    ):
+        count = await service.check_sla_breaches(db)
+
+    assert count >= 1
+    assert incident.sla_breached is True
+
+
+@pytest.mark.asyncio
+async def test_sla_summary_with_breach(db: AsyncSession):
+    """get_sla_summary()が違反ありインシデントを正しく集計すること"""
+    past_deadline = datetime.now(UTC) - timedelta(hours=1)
+    breached = _make_incident(
+        priority="P1", status="In_Progress", sla_breached=True, sla_resolution_due_at=past_deadline
+    )
+    not_breached = _make_incident(
+        priority="P1", status="In_Progress", sla_breached=False
+    )
+    db.add(breached)
+    db.add(not_breached)
+    await db.flush()
+
+    service = SLAMonitorService()
+    summary = await service.get_sla_summary(db)
+
+    assert "P1" in summary
+    p1 = summary["P1"]
+    assert p1["total"] >= 2
+    assert p1["breached"] >= 1
+    assert p1["compliance_rate"] < 100.0
