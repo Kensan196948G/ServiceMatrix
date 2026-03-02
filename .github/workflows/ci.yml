@@ -107,13 +107,24 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Scan for Secrets
+      - name: Scan for Secrets (Push)
+        if: github.event_name == 'push'
         uses: trufflesecurity/trufflehog@main
         with:
           path: ./
-          base: main
-          head: HEAD
-          extra_args: --debug --only-verified
+          base: ${{ github.event.before }}
+          head: ${{ github.sha }}
+          extra_args: --only-verified
+        continue-on-error: true
+
+      - name: Scan for Secrets (PR)
+        if: github.event_name == 'pull_request'
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: ./
+          base: ${{ github.event.pull_request.base.sha }}
+          head: ${{ github.sha }}
+          extra_args: --only-verified
         continue-on-error: true
 
   # ─────────────────────────────────────────────────
