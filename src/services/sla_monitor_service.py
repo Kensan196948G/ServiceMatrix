@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.core.logging import get_logger
 from src.models.incident import Incident
 from src.services import audit_service
+from src.services.notification_service import notification_service
 
 logger = get_logger(__name__)
 
@@ -68,6 +69,15 @@ class SLAMonitorService:
                 )
             except Exception as e:  # noqa: BLE001
                 logger.warning("audit_log_failed_in_sla_monitor", error=str(e))
+            try:
+                await notification_service.notify_sla_breach(
+                    incident_number=incident.incident_number,
+                    incident_title=incident.title,
+                    priority=incident.priority,
+                    breach_type="resolution",
+                )
+            except Exception as e:  # noqa: BLE001
+                logger.warning("notification_failed_in_sla_monitor", error=str(e))
 
         breach_count = len(incidents)
         if breach_count > 0:

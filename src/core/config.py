@@ -39,6 +39,12 @@ class Settings(BaseSettings):
     # GitHub Webhook
     github_webhook_secret: str = ""
 
+    # アラート・通知設定
+    github_token: str = ""  # noqa: S105
+    github_repo: str = ""
+    alert_webhook_url: str = ""
+    alert_webhook_enabled: bool = False
+
 
 @lru_cache
 def get_settings() -> Settings:
