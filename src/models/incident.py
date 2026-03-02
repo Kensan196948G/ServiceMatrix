@@ -89,6 +89,7 @@ class Incident(Base, TimestampMixin):
     subcategory: Mapped[str | None] = mapped_column(String(100))
     affected_service: Mapped[str | None] = mapped_column(String(200))
     resolution_notes: Mapped[str | None] = mapped_column(Text)
+    ai_triage_notes: Mapped[str | None] = mapped_column(Text)
 
     # リレーション
     assignee: Mapped["User | None"] = relationship(  # noqa: F821

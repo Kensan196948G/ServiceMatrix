@@ -50,6 +50,7 @@ class IncidentResponse(BaseModel):
     category: str | None
     affected_service: str | None
     resolution_notes: str | None
+    ai_triage_notes: str | None = None
     created_at: datetime
     updated_at: datetime
 
