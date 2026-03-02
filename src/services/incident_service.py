@@ -83,16 +83,23 @@ async def transition_status(
     now = datetime.now(timezone.utc)
     incident.status = new_status
 
+    def _aware(dt: datetime | None) -> datetime | None:
+        """SQLiteでtimezone情報が失われた場合にUTCとして補完する"""
+        if dt is not None and dt.tzinfo is None:
+            return dt.replace(tzinfo=timezone.utc)
+        return dt
+
     if new_status == "Acknowledged" and incident.acknowledged_at is None:
         incident.acknowledged_at = now
-        # 応答SLA達成確認
-        if incident.sla_response_due_at and now > incident.sla_response_due_at:
+        sla_due = _aware(incident.sla_response_due_at)
+        if sla_due and now > sla_due:
             incident.sla_breached = True
             logger.warning("sla_response_breached", incident_number=incident.incident_number)
 
     elif new_status == "Resolved":
         incident.resolved_at = now
-        if incident.sla_resolution_due_at and now > incident.sla_resolution_due_at:
+        sla_due = _aware(incident.sla_resolution_due_at)
+        if sla_due and now > sla_due:
             incident.sla_breached = True
             logger.warning("sla_resolution_breached", incident_number=incident.incident_number)
 
