@@ -1,0 +1,144 @@
+name: ServiceMatrix CI
+
+on:
+  push:
+    branches:
+      - main
+      - 'feature/**'
+      - 'fix/**'
+      - 'docs/**'
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  # ─────────────────────────────────────────────────
+  # Job 1: Markdown Lint
+  # ─────────────────────────────────────────────────
+  lint-markdown:
+    name: Markdown Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install markdownlint-cli2
+        run: npm install -g markdownlint-cli2
+
+      - name: Run Markdown Lint
+        run: markdownlint-cli2 "**/*.md" --config .markdownlint.json || true
+
+  # ─────────────────────────────────────────────────
+  # Job 2: Docs Structure Validation
+  # ─────────────────────────────────────────────────
+  validate-docs-structure:
+    name: Validate Docs Structure
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check Required Documents Exist
+        run: |
+          echo "🔍 必須ドキュメント存在確認..."
+          MISSING=0
+
+          required_docs=(
+            "docs/00_foundation/SERVICEMATRIX_CHARTER.md"
+            "docs/01_governance/GOVERNANCE_MODEL.md"
+            "docs/02_architecture/SYSTEM_ARCHITECTURE_OVERVIEW.md"
+            "docs/03_process/INCIDENT_MANAGEMENT_MODEL.md"
+            "docs/03_process/CHANGE_MANAGEMENT_MODEL.md"
+            "docs/04_agents_ai/AI_GOVERNANCE_POLICY.md"
+            "docs/05_devops/BRANCH_STRATEGY.md"
+            "docs/05_devops/PULL_REQUEST_POLICY.md"
+            "docs/06_security_compliance/ACCESS_CONTROL_MODEL.md"
+            "docs/07_sla_metrics/SLA_DEFINITION.md"
+          )
+
+          for doc in "${required_docs[@]}"; do
+            if [ ! -f "$doc" ]; then
+              echo "❌ 必須ドキュメントが見つかりません: $doc"
+              MISSING=$((MISSING + 1))
+            else
+              echo "✅ $doc"
+            fi
+          done
+
+          if [ $MISSING -gt 0 ]; then
+            echo "⚠️  $MISSING 件の必須ドキュメントが不足しています"
+            exit 1
+          fi
+          echo "✅ 全必須ドキュメント確認完了"
+
+  # ─────────────────────────────────────────────────
+  # Job 3: YAML/JSON Validation
+  # ─────────────────────────────────────────────────
+  validate-config-files:
+    name: Validate Config Files
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate GitHub Actions Workflows
+        run: |
+          echo "🔍 GitHub Actions ワークフロー構文確認..."
+          for f in .github/workflows/*.yml; do
+            python3 -c "import yaml; yaml.safe_load(open('$f'))" && echo "✅ $f" || echo "❌ $f"
+          done
+
+  # ─────────────────────────────────────────────────
+  # Job 4: Security Scan
+  # ─────────────────────────────────────────────────
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Scan for Secrets
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: ./
+          base: main
+          head: HEAD
+          extra_args: --debug --only-verified
+        continue-on-error: true
+
+  # ─────────────────────────────────────────────────
+  # Job 5: Summary Report
+  # ─────────────────────────────────────────────────
+  ci-summary:
+    name: CI Summary
+    runs-on: ubuntu-latest
+    needs:
+      - lint-markdown
+      - validate-docs-structure
+      - validate-config-files
+    if: always()
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Generate CI Summary
+        run: |
+          echo "## 📊 ServiceMatrix CI Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Job | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Markdown Lint | ${{ needs.lint-markdown.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Docs Structure | ${{ needs.validate-docs-structure.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Config Validation | ${{ needs.validate-config-files.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "🕐 実行時刻: $(date '+%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY

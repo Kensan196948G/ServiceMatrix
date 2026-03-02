@@ -1,0 +1,77 @@
+# ServiceMatrix .gitignore
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Node.js
+node_modules/
+dist/
+build/
+.npm
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+.venv/
+*.egg-info/
+dist/
+build/
+
+# Secrets / credentials
+*.pem
+*.key
+secrets/
+.secrets/
+credentials.json
+
+# Test coverage
+coverage/
+.nyc_output/
+htmlcov/
+.coverage
+.tox/
+
+# Temporary files
+tmp/
+temp/
+.tmp/
+
+# Claude Code
+.claude/

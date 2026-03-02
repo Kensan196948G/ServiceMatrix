@@ -1,0 +1,116 @@
+name: PR Governance Check
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+    branches:
+      - main
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+jobs:
+  # ─────────────────────────────────────────────────
+  # Job 1: PR Policy Validation
+  # ─────────────────────────────────────────────────
+  pr-policy-check:
+    name: PR Policy Validation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate PR Title
+        run: |
+          PR_TITLE="${{ github.event.pull_request.title }}"
+          echo "PR タイトル: $PR_TITLE"
+
+          # PRタイトルのフォーマット検証
+          if [[ "$PR_TITLE" =~ ^(feat|fix|docs|refactor|test|ci|chore|security|perf)(\(.+\))?: .+ ]]; then
+            echo "✅ PR タイトルフォーマット OK"
+          else
+            echo "⚠️  推奨フォーマット: feat(scope): description"
+            echo "   例: feat(incident): インシデント管理モデル追加"
+          fi
+
+      - name: Check Branch Name Convention
+        run: |
+          BRANCH="${{ github.head_ref }}"
+          echo "ブランチ名: $BRANCH"
+
+          if [[ "$BRANCH" =~ ^(feature|fix|docs|refactor|test|ci|security)/.+ ]]; then
+            echo "✅ ブランチ命名規則 OK"
+          else
+            echo "⚠️  推奨ブランチ命名: feature/description, fix/description 等"
+          fi
+
+      - name: Validate Changed Files
+        run: |
+          echo "🔍 変更ファイル確認..."
+          git diff --name-only origin/main..HEAD | head -50
+
+  # ─────────────────────────────────────────────────
+  # Job 2: Change Risk Assessment
+  # ─────────────────────────────────────────────────
+  change-risk-assessment:
+    name: Change Risk Assessment
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Assess Change Risk
+        run: |
+          echo "## ⚠️ 変更リスク評価" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          CHANGED_FILES=$(git diff --name-only origin/main..HEAD | wc -l)
+          echo "変更ファイル数: $CHANGED_FILES" >> $GITHUB_STEP_SUMMARY
+
+          # リスクスコア算出（簡易版）
+          RISK="低"
+          if [ $CHANGED_FILES -gt 10 ]; then
+            RISK="中"
+          fi
+          if [ $CHANGED_FILES -gt 30 ]; then
+            RISK="高"
+          fi
+
+          echo "リスクレベル: **$RISK**" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 変更ファイル一覧" >> $GITHUB_STEP_SUMMARY
+          git diff --name-only origin/main..HEAD | head -20 >> $GITHUB_STEP_SUMMARY
+
+  # ─────────────────────────────────────────────────
+  # Job 3: SLA Impact Check
+  # ─────────────────────────────────────────────────
+  sla-impact-check:
+    name: SLA Impact Assessment
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check SLA-Critical Files
+        run: |
+          echo "🔍 SLA影響チェック..."
+          SLA_CRITICAL_PATTERNS=(
+            "docs/07_sla_metrics/"
+            "docs/03_process/"
+            "docs/08_operations/"
+          )
+
+          for pattern in "${SLA_CRITICAL_PATTERNS[@]}"; do
+            if git diff --name-only origin/main..HEAD | grep -q "$pattern"; then
+              echo "⚠️  SLA影響あり: $pattern の変更が検出されました"
+            fi
+          done
+          echo "✅ SLA影響チェック完了"
