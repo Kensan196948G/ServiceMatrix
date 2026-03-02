@@ -116,3 +116,21 @@ async def verify_hash_chain(
         prev_hash = log.current_hash
 
     return True, None
+
+
+async def get_audit_logs(
+    db: AsyncSession,
+    entity_type: str | None = None,
+    entity_id: str | None = None,
+    limit: int = 50,
+    offset: int = 0,
+) -> list[AuditLog]:
+    """監査ログ一覧取得（フィルタ・ページネーション対応）"""
+    query = select(AuditLog).order_by(AuditLog.sequence_number.desc())
+    if entity_type:
+        query = query.where(AuditLog.resource_type == entity_type)
+    if entity_id:
+        query = query.where(AuditLog.resource_id == entity_id)
+    query = query.limit(limit).offset(offset)
+    result = await db.execute(query)
+    return list(result.scalars().all())
