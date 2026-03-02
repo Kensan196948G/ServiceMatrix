@@ -17,8 +17,10 @@ from src.schemas.change import (
     ChangeStatusTransition,
     ChangeUpdate,
 )
+from src.schemas.change_risk import RiskAssessmentResultSchema
 from src.schemas.common import PaginatedResponse
 from src.services import change_service
+from src.services.change_risk_service import change_risk_service
 
 router = APIRouter(prefix="/changes", tags=["changes"])
 
@@ -158,3 +160,21 @@ async def cab_approval(
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e)) from e
     return change
+
+
+@router.post(
+    "/{change_id}/risk-assessment",
+    response_model=RiskAssessmentResultSchema,
+    summary="リスク自動評価",
+    description="Changeのリスクを自動評価します。",
+)
+async def assess_change_risk(
+    change_id: uuid.UUID,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+) -> RiskAssessmentResultSchema:
+    try:
+        result = await change_risk_service.assess_risk(db, str(change_id))
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
+    return RiskAssessmentResultSchema(**result.__dict__)
