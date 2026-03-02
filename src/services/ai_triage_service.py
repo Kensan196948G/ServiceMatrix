@@ -1,10 +1,12 @@
 """AIトリアージサービス - キーワードベース優先度・カテゴリ自動判定"""
 import uuid as _uuid
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.core.config import settings
 from src.core.logging import get_logger
 from src.models.incident import Incident
 
@@ -19,8 +21,15 @@ class AITriageResult:
     reasoning: str
 
 
-class AITriageService:
-    """キーワードマッチングによるトリアージエンジン（本番ではLLM APIに差し替え可能）"""
+class TriageProvider(ABC):
+    """トリアージプロバイダー抽象基底クラス"""
+
+    @abstractmethod
+    async def analyze(self, title: str, description: str | None) -> AITriageResult: ...
+
+
+class KeywordTriageProvider(TriageProvider):
+    """既存のキーワードベーストリアージ（デフォルト、LLMなしで動作）"""
 
     CRITICAL_KEYWORDS = ["down", "outage", "critical", "production", "障害", "停止", "緊急"]
     HIGH_KEYWORDS = ["error", "failed", "timeout", "エラー", "失敗", "遅延"]
@@ -31,13 +40,10 @@ class AITriageService:
     DB_KEYWORDS = ["database", "db", "sql", "query", "データベース", "クエリ"]
     INFRA_KEYWORDS = ["server", "cpu", "memory", "disk", "load", "サーバー", "メモリ", "ディスク"]
 
-    async def triage(self, title: str, description: str | None) -> AITriageResult:
-        """キーワードマッチングで優先度・カテゴリを判定する"""
+    async def analyze(self, title: str, description: str | None) -> AITriageResult:
         text = f"{title} {description or ''}".lower()
-
         priority, priority_confidence, priority_reason = self._determine_priority(text)
         category, category_reason = self._determine_category(text)
-
         reasoning = f"Priority: {priority_reason}. Category: {category_reason}."
         return AITriageResult(
             priority=priority,
@@ -72,6 +78,69 @@ class AITriageService:
             matched = [kw for kw in self.INFRA_KEYWORDS if kw in text]
             return "Infrastructure", f"Infrastructure keywords matched: {matched}"
         return "Unknown", "No category keywords matched"
+
+
+class OpenAITriageProvider(TriageProvider):
+    """OpenAI API使用トリアージ（openai_api_keyが設定されている場合に使用）"""
+
+    def __init__(self, api_key: str, model: str, api_base: str = ""):
+        self.api_key = api_key
+        self.model = model
+        self.api_base = api_base
+
+    async def analyze(self, title: str, description: str | None) -> AITriageResult:
+        try:
+            import openai  # noqa: PLC0415
+
+            client_kwargs: dict = {"api_key": self.api_key}
+            if self.api_base:
+                client_kwargs["base_url"] = self.api_base
+            client = openai.AsyncOpenAI(**client_kwargs)
+
+            prompt = (
+                f"Triage this incident. Title: {title}. Description: {description or ''}.\n"
+                "Respond in JSON: {priority: Critical|High|Medium|Low, "
+                "category: Network|Database|Application|Security|Infrastructure|Unknown, "
+                "confidence: 0.0-1.0, reasoning: string}"
+            )
+            response = await client.chat.completions.create(
+                model=self.model,
+                messages=[{"role": "user", "content": prompt}],
+                response_format={"type": "json_object"},
+            )
+            import json  # noqa: PLC0415
+
+            data = json.loads(response.choices[0].message.content or "{}")
+            return AITriageResult(
+                priority=data.get("priority", "Medium"),
+                category=data.get("category", "Unknown"),
+                confidence=float(data.get("confidence", 0.5)),
+                reasoning=data.get("reasoning", "LLM triage"),
+            )
+        except ImportError:
+            logger.warning("openai package not installed; falling back to keyword triage")
+            return await KeywordTriageProvider().analyze(title, description)
+
+
+def get_triage_provider() -> TriageProvider:
+    """設定に基づいてプロバイダーを返すファクトリ関数"""
+    provider = settings.llm_provider
+    if provider == "openai" and settings.openai_api_key:
+        return OpenAITriageProvider(settings.openai_api_key, settings.llm_model)
+    if provider in ("azure_openai", "ollama") and settings.openai_api_base:
+        return OpenAITriageProvider(
+            settings.openai_api_key, settings.llm_model, settings.openai_api_base
+        )
+    return KeywordTriageProvider()
+
+
+class AITriageService:
+    """トリアージエンジン（プロバイダー経由でLLM/キーワード切り替え可能）"""
+
+    async def triage(self, title: str, description: str | None) -> AITriageResult:
+        """プロバイダー経由で優先度・カテゴリを判定する"""
+        provider = get_triage_provider()
+        return await provider.analyze(title, description)
 
     async def apply_triage_to_incident(
         self, db: AsyncSession, incident_id: str

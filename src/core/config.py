@@ -39,6 +39,12 @@ class Settings(BaseSettings):
     # GitHub Webhook
     github_webhook_secret: str = ""
 
+    # LLM設定
+    llm_provider: str = "keyword"  # "keyword" | "openai" | "azure_openai" | "ollama"
+    llm_model: str = "gpt-4o-mini"
+    openai_api_key: str = ""  # noqa: S105
+    openai_api_base: str = ""  # Azure OpenAIのエンドポイントまたはOllamaのURL
+
 
 @lru_cache
 def get_settings() -> Settings:
