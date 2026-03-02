@@ -7,7 +7,13 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from src.schemas.service_request import VALID_SR_TRANSITIONS
-from src.services.service_request_service import transition_service_request_status
+from src.services.service_request_service import (
+    _get_next_sr_number,
+    create_service_request,
+    get_service_requests,
+    transition_service_request_status,
+    update_service_request,
+)
 
 
 def test_sr_number_format():
@@ -68,7 +74,9 @@ async def test_sr_fulfilled_sets_fulfilled_at():
     mock_sr.fulfilled_at = None
 
     mock_db = AsyncMock()
-    mock_db.execute = AsyncMock(return_value=MagicMock(scalar_one_or_none=MagicMock(return_value=mock_sr)))
+    mock_db.execute = AsyncMock(
+        return_value=MagicMock(scalar_one_or_none=MagicMock(return_value=mock_sr))
+    )
     mock_db.flush = AsyncMock()
     mock_db.refresh = AsyncMock()
 
@@ -93,9 +101,131 @@ async def test_sr_invalid_transition():
     mock_sr.status = "New"
 
     mock_db = AsyncMock()
-    mock_db.execute = AsyncMock(return_value=MagicMock(scalar_one_or_none=MagicMock(return_value=mock_sr)))
+    mock_db.execute = AsyncMock(
+        return_value=MagicMock(scalar_one_or_none=MagicMock(return_value=mock_sr))
+    )
 
     with pytest.raises(ValueError, match="遷移は許可されていません"):
         await transition_service_request_status(
             mock_db, mock_sr.request_id, "Fulfilled", None
         )
+
+
+@pytest.mark.asyncio
+async def test_sr_not_found_raises_value_error():
+    """存在しないSRへの遷移でValueErrorが発生すること"""
+    mock_db = AsyncMock()
+    mock_db.execute = AsyncMock(
+        return_value=MagicMock(scalar_one_or_none=MagicMock(return_value=None))
+    )
+    request_id = uuid.uuid4()
+    with pytest.raises(ValueError, match="が見つかりません"):
+        await transition_service_request_status(mock_db, request_id, "Fulfilled", None)
+
+
+@pytest.mark.asyncio
+async def test_get_next_sr_number_format():
+    """_get_next_sr_numberが正しいフォーマットを返すこと"""
+    mock_db = AsyncMock()
+    mock_result = MagicMock()
+    mock_result.scalar_one.return_value = 42
+    mock_db.execute = AsyncMock(return_value=mock_result)
+
+    sr_number = await _get_next_sr_number(mock_db)
+    year = datetime.now(UTC).year
+    assert sr_number == f"SR-{year}-000042"
+    assert re.match(r"^SR-\d{4}-\d{6}$", sr_number)
+
+
+@pytest.mark.asyncio
+async def test_create_service_request():
+    """create_service_requestがServiceRequestを返すこと"""
+    mock_sr = MagicMock()
+    mock_sr.request_id = uuid.uuid4()
+    mock_sr.request_number = "SR-2025-000001"
+
+    mock_db = AsyncMock()
+    seq_result = MagicMock()
+    seq_result.scalar_one.return_value = 1
+    mock_db.execute = AsyncMock(return_value=seq_result)
+    mock_db.add = MagicMock()
+    mock_db.flush = AsyncMock()
+    mock_db.refresh = AsyncMock(side_effect=lambda obj: None)
+
+    with pytest.MonkeyPatch().context() as m:
+        m.setattr(
+            "src.services.service_request_service.audit_service.record_audit_log",
+            AsyncMock(),
+        )
+        m.setattr(
+            "src.services.service_request_service.ServiceRequest",
+            MagicMock(return_value=mock_sr),
+        )
+        result = await create_service_request(mock_db, {"title": "Test SR"})
+
+    assert result is mock_sr
+
+
+@pytest.mark.asyncio
+async def test_get_service_requests_with_status_filter():
+    """statusフィルタを指定してget_service_requestsが動作すること"""
+    mock_db = AsyncMock()
+    count_result = MagicMock()
+    count_result.scalar_one.return_value = 1
+    items_result = MagicMock()
+    items_result.scalars.return_value.all.return_value = [MagicMock()]
+    mock_db.execute = AsyncMock(side_effect=[count_result, items_result])
+
+    items, total = await get_service_requests(mock_db, status="New", skip=0, limit=10)
+    assert total == 1
+    assert len(items) == 1
+
+
+@pytest.mark.asyncio
+async def test_get_service_requests_no_filter():
+    """statusフィルタなしでget_service_requestsが動作すること"""
+    mock_db = AsyncMock()
+    count_result = MagicMock()
+    count_result.scalar_one.return_value = 2
+    items_result = MagicMock()
+    items_result.scalars.return_value.all.return_value = [MagicMock(), MagicMock()]
+    mock_db.execute = AsyncMock(side_effect=[count_result, items_result])
+
+    items, total = await get_service_requests(mock_db, status=None, skip=0, limit=10)
+    assert total == 2
+    assert len(items) == 2
+
+
+@pytest.mark.asyncio
+async def test_update_service_request_not_found():
+    """存在しないSRの更新でNoneを返すこと"""
+    mock_db = AsyncMock()
+    mock_db.execute = AsyncMock(
+        return_value=MagicMock(scalar_one_or_none=MagicMock(return_value=None))
+    )
+    result = await update_service_request(mock_db, uuid.uuid4(), {"title": "Updated"})
+    assert result is None
+
+
+@pytest.mark.asyncio
+async def test_update_service_request_success():
+    """既存SRの更新が正常に動作すること"""
+    mock_sr = MagicMock()
+    mock_sr.request_id = uuid.uuid4()
+    mock_sr.title = "Old Title"
+
+    mock_db = AsyncMock()
+    mock_db.execute = AsyncMock(
+        return_value=MagicMock(scalar_one_or_none=MagicMock(return_value=mock_sr))
+    )
+    mock_db.flush = AsyncMock()
+    mock_db.refresh = AsyncMock()
+
+    with pytest.MonkeyPatch().context() as m:
+        m.setattr(
+            "src.services.service_request_service.audit_service.record_audit_log",
+            AsyncMock(),
+        )
+        result = await update_service_request(mock_db, mock_sr.request_id, {"title": "New Title"})
+
+    assert result is mock_sr
