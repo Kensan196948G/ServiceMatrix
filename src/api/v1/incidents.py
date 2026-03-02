@@ -2,7 +2,7 @@
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -18,6 +18,7 @@ from src.schemas.incident import (
     IncidentUpdate,
 )
 from src.services import incident_service
+from src.services.ai_triage_service import ai_triage_service
 
 router = APIRouter(prefix="/incidents", tags=["incidents"])
 
@@ -60,6 +61,7 @@ async def list_incidents(
              description="新規インシデントを作成します。SLA自動計算・優先度設定に対応。")
 async def create_incident(
     data: IncidentCreate,
+    background_tasks: BackgroundTasks,
     db: Annotated[AsyncSession, Depends(get_db)],
     current_user: Annotated[User, Depends(require_role(
         UserRole.SYSTEM_ADMIN, UserRole.SERVICE_MANAGER,
@@ -68,6 +70,9 @@ async def create_incident(
 ):
     """インシデント作成"""
     incident = await incident_service.create_incident(db, data.model_dump(exclude_none=True))
+    background_tasks.add_task(
+        ai_triage_service.apply_triage_to_incident, db, str(incident.incident_id)
+    )
     return incident
 
 
