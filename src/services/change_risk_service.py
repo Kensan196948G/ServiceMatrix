@@ -1,6 +1,6 @@
 """Change管理リスク自動評価サービス"""
 import uuid as _uuid
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
 import structlog
