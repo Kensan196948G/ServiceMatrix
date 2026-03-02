@@ -1,0 +1,40 @@
+# CODEOWNERS
+# ServiceMatrix Code Ownership Definitions
+# Version: 1.0
+# Ref: docs/05_devops/PULL_REQUEST_POLICY.md Section 5.3
+
+# デフォルトレビュアー
+*                           @servicematrix/core-team
+
+# アーキテクチャドキュメント
+docs/02_architecture/       @servicematrix/architects
+
+# セキュリティ関連
+docs/06_security_compliance/ @servicematrix/security-team
+**/security/**              @servicematrix/security-team
+
+# CI/CD 設定
+.github/workflows/          @servicematrix/devops-team
+.github/actions/            @servicematrix/devops-team
+
+# 統治ドキュメント
+docs/01_governance/         @servicematrix/governance-team
+CLAUDE.md                   @servicematrix/governance-team
+
+# SLA 定義
+docs/07_sla_metrics/        @servicematrix/sla-team
+
+# AI ガバナンス
+docs/04_agents_ai/          @servicematrix/ai-governance-team
+
+# データモデル
+docs/11_data_model/         @servicematrix/architects
+
+# CMDB
+docs/10_cmdb/               @servicematrix/core-team
+
+# リリース管理
+docs/14_release_management/ @servicematrix/devops-team
+
+# 監査証跡
+docs/15_audit_evidence/     @servicematrix/governance-team
