@@ -1,4 +1,5 @@
 """変更管理モデル（月次パーティション対応）"""
+
 import enum
 import uuid
 from datetime import datetime
@@ -39,30 +40,25 @@ class ChangeStatus(enum.StrEnum):
 
 class Change(Base, TimestampMixin):
     """変更管理テーブル - CAB承認フロー対応"""
+
     __tablename__ = "changes"
     __table_args__ = (
         CheckConstraint(
-            "change_type IN ('Standard','Normal','Emergency','Major')",
-            name="chk_change_type"
+            "change_type IN ('Standard','Normal','Emergency','Major')", name="chk_change_type"
         ),
         CheckConstraint(
             "status IN ('Draft','Submitted','CAB_Review','Approved','Rejected',"
             "'Scheduled','In_Progress','Completed','Cancelled','Failed')",
-            name="chk_change_status"
+            name="chk_change_status",
         ),
-        CheckConstraint(
-            "risk_score >= 0 AND risk_score <= 100",
-            name="chk_change_risk_score"
-        ),
+        CheckConstraint("risk_score >= 0 AND risk_score <= 100", name="chk_change_risk_score"),
         {"postgresql_partition_by": "RANGE (created_at)"},
     )
 
     change_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
-    change_number: Mapped[str] = mapped_column(
-        String(20), nullable=False, unique=True, index=True
-    )
+    change_number: Mapped[str] = mapped_column(String(20), nullable=False, unique=True, index=True)
     title: Mapped[str] = mapped_column(String(500), nullable=False)
     description: Mapped[str | None] = mapped_column(Text)
     change_type: Mapped[str] = mapped_column(String(20), nullable=False, default="Normal")

@@ -1,4 +1,5 @@
 """J-SOX準拠 SHA-256ハッシュチェーン監査サービス"""
+
 import hashlib
 import json
 from datetime import UTC, datetime
@@ -21,9 +22,7 @@ async def get_next_sequence(db: AsyncSession) -> int:
 async def get_last_hash(db: AsyncSession) -> str | None:
     """最新の監査ログハッシュを取得"""
     result = await db.execute(
-        select(AuditLog.current_hash)
-        .order_by(AuditLog.sequence_number.desc())
-        .limit(1)
+        select(AuditLog.current_hash).order_by(AuditLog.sequence_number.desc()).limit(1)
     )
     return result.scalar_one_or_none()
 

@@ -1,4 +1,5 @@
 """インシデント管理モデル（月次パーティション対応）"""
+
 import enum
 import uuid
 from datetime import datetime
@@ -29,24 +30,22 @@ class IncidentStatus(enum.StrEnum):
 
 class Incident(Base, TimestampMixin):
     """インシデントテーブル - PostgreSQL月次パーティションにより大量データに対応"""
+
     __tablename__ = "incidents"
     __table_args__ = (
-        CheckConstraint(
-            "priority IN ('P1','P2','P3','P4')",
-            name="chk_incident_priority"
-        ),
+        CheckConstraint("priority IN ('P1','P2','P3','P4')", name="chk_incident_priority"),
         CheckConstraint(
             "status IN ('New','Acknowledged','In_Progress','Pending',"
             "'Workaround_Applied','Resolved','Closed')",
-            name="chk_incident_status"
+            name="chk_incident_status",
         ),
         CheckConstraint(
             "acknowledged_at IS NULL OR acknowledged_at >= created_at",
-            name="chk_incident_acknowledged_at"
+            name="chk_incident_acknowledged_at",
         ),
         CheckConstraint(
             "resolved_at IS NULL OR closed_at IS NULL OR closed_at >= resolved_at",
-            name="chk_incident_closed_at"
+            name="chk_incident_closed_at",
         ),
         # 月次パーティション設定（PostgreSQL PARTITION BY RANGE）
         # 実際のパーティション作成はAlembicマイグレーションで行う

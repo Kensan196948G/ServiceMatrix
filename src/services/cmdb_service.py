@@ -1,4 +1,5 @@
 """CMDB構成管理サービス"""
+
 import uuid
 from typing import Any
 
@@ -50,9 +51,7 @@ async def get_cis(
 
 
 async def get_ci(db: AsyncSession, ci_id: uuid.UUID) -> ConfigurationItem | None:
-    result = await db.execute(
-        select(ConfigurationItem).where(ConfigurationItem.ci_id == ci_id)
-    )
+    result = await db.execute(select(ConfigurationItem).where(ConfigurationItem.ci_id == ci_id))
     return result.scalar_one_or_none()
 
 
@@ -79,9 +78,7 @@ async def update_ci(
     return ci
 
 
-async def create_ci_relationship(
-    db: AsyncSession, data: dict[str, Any]
-) -> CIRelationship:
+async def create_ci_relationship(db: AsyncSession, data: dict[str, Any]) -> CIRelationship:
     if data.get("source_ci_id") == data.get("target_ci_id"):
         raise ValueError("source_ci_id と target_ci_id に同じCIは指定できません")
 
@@ -97,9 +94,7 @@ async def create_ci_relationship(
     return rel
 
 
-async def get_ci_relationships(
-    db: AsyncSession, ci_id: uuid.UUID
-) -> list[CIRelationship]:
+async def get_ci_relationships(db: AsyncSession, ci_id: uuid.UUID) -> list[CIRelationship]:
     result = await db.execute(
         select(CIRelationship).where(
             or_(
@@ -112,9 +107,7 @@ async def get_ci_relationships(
 
 
 async def analyze_impact(db: AsyncSession, ci_id: uuid.UUID) -> dict:
-    result = await db.execute(
-        select(CIRelationship).where(CIRelationship.source_ci_id == ci_id)
-    )
+    result = await db.execute(select(CIRelationship).where(CIRelationship.source_ci_id == ci_id))
     outgoing = list(result.scalars().all())
 
     direct_target_ids = [r.target_ci_id for r in outgoing]

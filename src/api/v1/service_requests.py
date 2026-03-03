@@ -1,4 +1,5 @@
 """サービスリクエスト管理API - CRUD + ステータス遷移"""
+
 import uuid
 from typing import Annotated
 
@@ -45,10 +46,17 @@ async def list_service_requests(
 async def create_service_request(
     data: ServiceRequestCreate,
     db: Annotated[AsyncSession, Depends(get_db)],
-    current_user: Annotated[User, Depends(require_role(
-        UserRole.SYSTEM_ADMIN, UserRole.SERVICE_MANAGER,
-        UserRole.INCIDENT_MANAGER, UserRole.OPERATOR
-    ))],
+    current_user: Annotated[
+        User,
+        Depends(
+            require_role(
+                UserRole.SYSTEM_ADMIN,
+                UserRole.SERVICE_MANAGER,
+                UserRole.INCIDENT_MANAGER,
+                UserRole.OPERATOR,
+            )
+        ),
+    ],
 ):
     """サービスリクエスト作成"""
     sr = await service_request_service.create_service_request(
@@ -78,10 +86,17 @@ async def update_service_request(
     request_id: uuid.UUID,
     data: ServiceRequestUpdate,
     db: Annotated[AsyncSession, Depends(get_db)],
-    current_user: Annotated[User, Depends(require_role(
-        UserRole.SYSTEM_ADMIN, UserRole.SERVICE_MANAGER,
-        UserRole.INCIDENT_MANAGER, UserRole.OPERATOR
-    ))],
+    current_user: Annotated[
+        User,
+        Depends(
+            require_role(
+                UserRole.SYSTEM_ADMIN,
+                UserRole.SERVICE_MANAGER,
+                UserRole.INCIDENT_MANAGER,
+                UserRole.OPERATOR,
+            )
+        ),
+    ],
 ):
     """サービスリクエスト更新"""
     sr = await service_request_service.update_service_request(
@@ -100,10 +115,17 @@ async def transition_service_request_status(
     request_id: uuid.UUID,
     transition: ServiceRequestStatusTransition,
     db: Annotated[AsyncSession, Depends(get_db)],
-    current_user: Annotated[User, Depends(require_role(
-        UserRole.SYSTEM_ADMIN, UserRole.SERVICE_MANAGER,
-        UserRole.INCIDENT_MANAGER, UserRole.OPERATOR
-    ))],
+    current_user: Annotated[
+        User,
+        Depends(
+            require_role(
+                UserRole.SYSTEM_ADMIN,
+                UserRole.SERVICE_MANAGER,
+                UserRole.INCIDENT_MANAGER,
+                UserRole.OPERATOR,
+            )
+        ),
+    ],
 ):
     """サービスリクエストステータス遷移"""
     try:
@@ -111,7 +133,5 @@ async def transition_service_request_status(
             db, request_id, transition.target_status, transition.comment
         )
     except ValueError as e:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e)
-        ) from e
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e)) from e
     return sr

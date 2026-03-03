@@ -1,4 +1,5 @@
 """変更管理API - CRUD + リスク評価 + CAB承認"""
+
 import uuid
 from typing import Annotated
 
@@ -25,8 +26,12 @@ from src.services.change_risk_service import change_risk_service
 router = APIRouter(prefix="/changes", tags=["changes"])
 
 
-@router.get("", response_model=PaginatedResponse[ChangeResponse], summary="変更一覧取得",
-            description="フィルタ・ページネーション対応の変更リクエスト一覧を返します。")
+@router.get(
+    "",
+    response_model=PaginatedResponse[ChangeResponse],
+    summary="変更一覧取得",
+    description="フィルタ・ページネーション対応の変更リクエスト一覧を返します。",
+)
 async def list_changes(
     db: Annotated[AsyncSession, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
@@ -55,15 +60,22 @@ async def list_changes(
     )
 
 
-@router.post("", response_model=ChangeResponse, status_code=status.HTTP_201_CREATED,
-             summary="変更リクエスト作成",
-             description="新規変更リクエストを作成します。リスクスコアが自動計算されます。")
+@router.post(
+    "",
+    response_model=ChangeResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="変更リクエスト作成",
+    description="新規変更リクエストを作成します。リスクスコアが自動計算されます。",
+)
 async def create_change(
     data: ChangeCreate,
     db: Annotated[AsyncSession, Depends(get_db)],
-    current_user: Annotated[User, Depends(require_role(
-        UserRole.SYSTEM_ADMIN, UserRole.SERVICE_MANAGER, UserRole.CHANGE_MANAGER
-    ))],
+    current_user: Annotated[
+        User,
+        Depends(
+            require_role(UserRole.SYSTEM_ADMIN, UserRole.SERVICE_MANAGER, UserRole.CHANGE_MANAGER)
+        ),
+    ],
 ):
     """変更リクエスト作成（リスクスコア自動計算）"""
     change_data = data.model_dump(exclude_none=True)
@@ -72,8 +84,12 @@ async def create_change(
     return change
 
 
-@router.get("/{change_id}", response_model=ChangeResponse, summary="変更詳細取得",
-            description="指定されたIDの変更リクエスト詳細を返します。")
+@router.get(
+    "/{change_id}",
+    response_model=ChangeResponse,
+    summary="変更詳細取得",
+    description="指定されたIDの変更リクエスト詳細を返します。",
+)
 async def get_change(
     change_id: uuid.UUID,
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -87,15 +103,22 @@ async def get_change(
     return change
 
 
-@router.patch("/{change_id}", response_model=ChangeResponse, summary="変更更新",
-              description="指定されたIDの変更リクエストを部分更新します。")
+@router.patch(
+    "/{change_id}",
+    response_model=ChangeResponse,
+    summary="変更更新",
+    description="指定されたIDの変更リクエストを部分更新します。",
+)
 async def update_change(
     change_id: uuid.UUID,
     data: ChangeUpdate,
     db: Annotated[AsyncSession, Depends(get_db)],
-    current_user: Annotated[User, Depends(require_role(
-        UserRole.SYSTEM_ADMIN, UserRole.SERVICE_MANAGER, UserRole.CHANGE_MANAGER
-    ))],
+    current_user: Annotated[
+        User,
+        Depends(
+            require_role(UserRole.SYSTEM_ADMIN, UserRole.SERVICE_MANAGER, UserRole.CHANGE_MANAGER)
+        ),
+    ],
 ):
     """変更更新"""
     result = await db.execute(select(Change).where(Change.change_id == change_id))
@@ -110,16 +133,22 @@ async def update_change(
     return change
 
 
-@router.post("/{change_id}/transitions", response_model=ChangeResponse,
-             summary="変更ステータス遷移",
-             description="変更リクエストのステータスをCABワークフローに従って遷移させます。")
+@router.post(
+    "/{change_id}/transitions",
+    response_model=ChangeResponse,
+    summary="変更ステータス遷移",
+    description="変更リクエストのステータスをCABワークフローに従って遷移させます。",
+)
 async def transition_change_status(
     change_id: uuid.UUID,
     transition: ChangeStatusTransition,
     db: Annotated[AsyncSession, Depends(get_db)],
-    current_user: Annotated[User, Depends(require_role(
-        UserRole.SYSTEM_ADMIN, UserRole.SERVICE_MANAGER, UserRole.CHANGE_MANAGER
-    ))],
+    current_user: Annotated[
+        User,
+        Depends(
+            require_role(UserRole.SYSTEM_ADMIN, UserRole.SERVICE_MANAGER, UserRole.CHANGE_MANAGER)
+        ),
+    ],
 ):
     """変更ステータス遷移"""
     result = await db.execute(select(Change).where(Change.change_id == change_id))
@@ -134,18 +163,19 @@ async def transition_change_status(
     return change
 
 
-@router.post("/{change_id}/cab-approval", response_model=ChangeResponse,
-             summary="CAB承認・却下",
-             description=(
-                 "Change Advisory Board (CAB) による変更リクエストの承認または却下を行います。"
-             ))
+@router.post(
+    "/{change_id}/cab-approval",
+    response_model=ChangeResponse,
+    summary="CAB承認・却下",
+    description=("Change Advisory Board (CAB) による変更リクエストの承認または却下を行います。"),
+)
 async def cab_approval(
     change_id: uuid.UUID,
     approval: CABApproval,
     db: Annotated[AsyncSession, Depends(get_db)],
-    current_user: Annotated[User, Depends(require_role(
-        UserRole.SYSTEM_ADMIN, UserRole.CHANGE_MANAGER
-    ))],
+    current_user: Annotated[
+        User, Depends(require_role(UserRole.SYSTEM_ADMIN, UserRole.CHANGE_MANAGER))
+    ],
 ):
     """CAB承認・却下"""
     result = await db.execute(select(Change).where(Change.change_id == change_id))

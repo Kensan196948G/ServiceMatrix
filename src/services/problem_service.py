@@ -1,4 +1,5 @@
 """問題管理ビジネスロジック - Known Error DB・ステータス遷移"""
+
 from datetime import UTC, datetime
 from typing import Any
 
@@ -43,9 +44,7 @@ async def create_problem(db: AsyncSession, data: dict[str, Any]) -> Problem:
     return problem
 
 
-async def transition_problem_status(
-    db: AsyncSession, problem: Problem, new_status: str
-) -> Problem:
+async def transition_problem_status(db: AsyncSession, problem: Problem, new_status: str) -> Problem:
     """問題ステータスを遷移させる"""
     allowed = VALID_PROBLEM_TRANSITIONS.get(problem.status, set())
     if new_status not in allowed:
@@ -67,9 +66,7 @@ async def transition_problem_status(
     return problem
 
 
-async def mark_as_known_error(
-    db: AsyncSession, problem: Problem, workaround: str
-) -> Problem:
+async def mark_as_known_error(db: AsyncSession, problem: Problem, workaround: str) -> Problem:
     """問題を既知エラーとしてマークし、ワークアラウンドを記録する"""
     if not workaround or not workaround.strip():
         raise ValueError("既知エラーにはワークアラウンドの記載が必須です")

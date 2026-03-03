@@ -1,4 +1,5 @@
 """リクエスト自動監査ログミドルウェア"""
+
 import time
 
 from fastapi import Request, Response

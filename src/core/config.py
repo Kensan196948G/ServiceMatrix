@@ -1,4 +1,5 @@
 """アプリケーション設定 - Pydantic Settings"""
+
 from functools import lru_cache
 
 from pydantic_settings import BaseSettings, SettingsConfigDict

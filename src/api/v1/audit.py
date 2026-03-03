@@ -1,4 +1,5 @@
 """監査ログAPI - 一覧取得・フィルタ・整合性検証"""
+
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query

@@ -1,4 +1,5 @@
 """GitHub Webhook イベント処理サービス"""
+
 import hashlib
 import hmac
 
@@ -10,18 +11,21 @@ from src.services import incident_service
 logger = structlog.get_logger()
 
 GITHUB_ISSUE_PRIORITY_MAP = {
-    "P1": "P1", "critical": "P1", "urgent": "P1",
-    "P2": "P2", "high": "P2",
-    "P3": "P3", "medium": "P3",
-    "P4": "P4", "low": "P4",
+    "P1": "P1",
+    "critical": "P1",
+    "urgent": "P1",
+    "P2": "P2",
+    "high": "P2",
+    "P3": "P3",
+    "medium": "P3",
+    "P4": "P4",
+    "low": "P4",
 }
 
 
 def verify_webhook_signature(payload: bytes, signature: str, secret: str) -> bool:
     """GitHub署名検証（HMAC-SHA256）"""
-    expected = "sha256=" + hmac.new(
-        secret.encode(), payload, hashlib.sha256
-    ).hexdigest()
+    expected = "sha256=" + hmac.new(secret.encode(), payload, hashlib.sha256).hexdigest()
     return hmac.compare_digest(expected, signature)
 
 
@@ -42,13 +46,16 @@ async def process_issues_event(db: AsyncSession, payload: dict) -> dict | None:
         title = f"[GitHub Issue #{issue_number}] {issue.get('title', '')}"
         description = issue.get("body") or ""
 
-        incident = await incident_service.create_incident(db, {
-            "title": title,
-            "description": description,
-            "priority": priority,
-            "status": "open",
-            "reported_by": "github-webhook",
-        })
+        incident = await incident_service.create_incident(
+            db,
+            {
+                "title": title,
+                "description": description,
+                "priority": priority,
+                "status": "open",
+                "reported_by": "github-webhook",
+            },
+        )
         logger.info(
             "github_issue_incident_created",
             issue_number=issue_number,

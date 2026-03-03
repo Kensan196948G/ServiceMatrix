@@ -1,4 +1,5 @@
 """Change管理リスク自動評価サービス"""
+
 import uuid as _uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
@@ -47,9 +48,7 @@ class ChangeRiskService:
 
     async def assess_risk(self, db: AsyncSession, change_id: str) -> RiskAssessmentResult:
         """Changeのリスクを自動評価"""
-        result = await db.execute(
-            select(Change).where(Change.change_id == _uuid.UUID(change_id))
-        )
+        result = await db.execute(select(Change).where(Change.change_id == _uuid.UUID(change_id)))
         change = result.scalar_one_or_none()
         if change is None:
             raise ValueError(f"Change not found: {change_id}")
@@ -107,9 +106,7 @@ class ChangeRiskService:
         else:
             return RiskFactor("timing", 0, "営業時間内作業")
 
-    async def _score_historical_failure(
-        self, db: AsyncSession, change_type: str
-    ) -> RiskFactor:
+    async def _score_historical_failure(self, db: AsyncSession, change_type: str) -> RiskFactor:
         """過去の失敗率スコア（直近30日のFailed件数×3、上限25）"""
         since = datetime.now(UTC) - timedelta(days=30)
         result = await db.execute(
@@ -152,9 +149,7 @@ class ChangeRiskService:
         else:
             return "Critical"
 
-    def _generate_recommendations(
-        self, factors: list[RiskFactor], risk_level: str
-    ) -> list[str]:
+    def _generate_recommendations(self, factors: list[RiskFactor], risk_level: str) -> list[str]:
         recommendations: list[str] = []
         factor_map = {f.factor_name: f for f in factors}
 

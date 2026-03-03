@@ -1,4 +1,5 @@
 """CMDB（構成管理データベース）モデル"""
+
 import uuid
 
 from sqlalchemy import JSON, CheckConstraint, ForeignKey, String, Text
@@ -10,11 +11,11 @@ from src.models.base import Base, TimestampMixin
 
 class ConfigurationItem(Base, TimestampMixin):
     """構成アイテム（CI）テーブル"""
+
     __tablename__ = "configuration_items"
     __table_args__ = (
         CheckConstraint(
-            "status IN ('Active','Inactive','Maintenance','Retired')",
-            name="chk_ci_status"
+            "status IN ('Active','Inactive','Maintenance','Retired')", name="chk_ci_status"
         ),
     )
 
@@ -45,6 +46,7 @@ class ConfigurationItem(Base, TimestampMixin):
 
 class CIRelationship(Base, TimestampMixin):
     """CI間の依存関係テーブル"""
+
     __tablename__ = "ci_relationships"
 
     relationship_id: Mapped[uuid.UUID] = mapped_column(
@@ -60,10 +62,14 @@ class CIRelationship(Base, TimestampMixin):
     description: Mapped[str | None] = mapped_column(Text)
 
     source_ci: Mapped["ConfigurationItem"] = relationship(
-        "ConfigurationItem", foreign_keys=[source_ci_id], lazy="select",
+        "ConfigurationItem",
+        foreign_keys=[source_ci_id],
+        lazy="select",
         overlaps="outgoing_relationships",
     )
     target_ci: Mapped["ConfigurationItem"] = relationship(
-        "ConfigurationItem", foreign_keys=[target_ci_id], lazy="select",
+        "ConfigurationItem",
+        foreign_keys=[target_ci_id],
+        lazy="select",
         overlaps="incoming_relationships",
     )

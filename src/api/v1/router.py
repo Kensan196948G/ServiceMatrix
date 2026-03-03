@@ -1,4 +1,5 @@
 """APIルーター集約"""
+
 from fastapi import APIRouter
 
 from src.api.v1.audit import router as audit_router

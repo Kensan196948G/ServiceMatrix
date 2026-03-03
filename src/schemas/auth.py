@@ -1,4 +1,5 @@
 """認証スキーマ"""
+
 import uuid
 
 from pydantic import BaseModel

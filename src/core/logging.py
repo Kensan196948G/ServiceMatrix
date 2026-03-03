@@ -1,4 +1,5 @@
 """構造化ログ設定 - structlog"""
+
 import logging
 
 import structlog
@@ -17,7 +18,8 @@ def setup_logging() -> None:
             structlog.processors.TimeStamper(fmt="iso"),
             structlog.stdlib.add_logger_name,
             structlog.processors.StackInfoRenderer(),
-            structlog.processors.JSONRenderer() if settings.environment == "production"
+            structlog.processors.JSONRenderer()
+            if settings.environment == "production"
             else structlog.dev.ConsoleRenderer(),
         ],
         wrapper_class=structlog.make_filtering_bound_logger(log_level),

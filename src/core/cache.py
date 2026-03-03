@@ -1,4 +1,5 @@
 """Redis キャッシュユーティリティ"""
+
 import redis.asyncio as aioredis
 import structlog
 

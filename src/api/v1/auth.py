@@ -1,4 +1,5 @@
 """認証API - /auth/login, /auth/refresh, /auth/me"""
+
 import uuid
 from datetime import UTC, datetime
 from typing import Annotated
@@ -27,9 +28,7 @@ async def login(
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     """ユーザーログイン - JWT発行"""
-    result = await db.execute(
-        select(User).where(User.username == credentials.username)
-    )
+    result = await db.execute(select(User).where(User.username == credentials.username))
     user = result.scalar_one_or_none()
 
     if not user or not verify_password(credentials.password, user.hashed_password):
@@ -74,9 +73,7 @@ async def refresh_token(
             detail="リフレッシュトークンが無効です",
         ) from e
 
-    result = await db.execute(
-        select(User).where(User.user_id == uuid.UUID(user_id))
-    )
+    result = await db.execute(select(User).where(User.user_id == uuid.UUID(user_id)))
     user = result.scalar_one_or_none()
     if not user or not user.is_active:
         raise HTTPException(

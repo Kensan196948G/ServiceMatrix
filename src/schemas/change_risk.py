@@ -1,4 +1,5 @@
 """変更管理リスク評価Pydanticスキーマ"""
+
 from pydantic import BaseModel
 
 

@@ -1,4 +1,5 @@
 """SLA監視API - サマリー・違反一覧・手動チェック"""
+
 import json
 from datetime import UTC, datetime
 from typing import Annotated

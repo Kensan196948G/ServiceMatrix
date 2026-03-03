@@ -1,4 +1,5 @@
 """監査ログ スキーマ"""
+
 import uuid
 from datetime import datetime
 

@@ -1,4 +1,5 @@
 """根本原因分析（RCA）サービス - パターンマッチング + 類似インシデント検索"""
+
 import uuid
 from dataclasses import dataclass, field
 
@@ -152,8 +153,7 @@ class RCAService:
         text_lower = text.lower()
         patterns = self._build_category_patterns()
         scores: dict[str, int] = {
-            cat: sum(1 for p in pats if p.lower() in text_lower)
-            for cat, pats in patterns.items()
+            cat: sum(1 for p in pats if p.lower() in text_lower) for cat, pats in patterns.items()
         }
 
         best_category = max(scores, key=lambda k: scores[k])

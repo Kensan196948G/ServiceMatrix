@@ -1,4 +1,5 @@
 """変更管理ビジネスロジック - リスクスコアリング・CAB承認フロー"""
+
 import uuid
 from datetime import UTC, datetime
 from typing import Any
@@ -14,9 +15,7 @@ logger = get_logger(__name__)
 # リスクスコアリングマトリクス
 IMPACT_SCORES: dict[str, int] = {"Low": 10, "Medium": 30, "High": 50}
 URGENCY_SCORES: dict[str, int] = {"Low": 5, "Medium": 15, "High": 30}
-CHANGE_TYPE_SCORES: dict[str, int] = {
-    "Standard": 0, "Normal": 10, "Emergency": 30, "Major": 20
-}
+CHANGE_TYPE_SCORES: dict[str, int] = {"Standard": 0, "Normal": 10, "Emergency": 30, "Major": 20}
 
 # リスクレベル判定
 RISK_THRESHOLDS = [
@@ -97,9 +96,7 @@ async def create_change(db: AsyncSession, data: dict[str, Any]) -> Change:
     return change
 
 
-async def transition_change_status(
-    db: AsyncSession, change: Change, new_status: str
-) -> Change:
+async def transition_change_status(db: AsyncSession, change: Change, new_status: str) -> Change:
     """変更ステータスを遷移させる"""
     allowed = VALID_CHANGE_TRANSITIONS.get(change.status, set())
     if new_status not in allowed:

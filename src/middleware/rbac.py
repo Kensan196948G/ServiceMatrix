@@ -1,4 +1,5 @@
 """RBAC（ロールベースアクセス制御）ミドルウェア - 6ロール定義"""
+
 import uuid
 from typing import Annotated
 
@@ -56,6 +57,7 @@ async def get_current_user(
 
 def require_role(*allowed_roles: UserRole):
     """指定ロール以上の権限を要求するデペンデンシー"""
+
     async def role_checker(
         current_user: Annotated[User, Depends(get_current_user)],
     ) -> User:
@@ -70,4 +72,5 @@ def require_role(*allowed_roles: UserRole):
                 ),
             )
         return current_user
+
     return role_checker

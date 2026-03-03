@@ -1,4 +1,5 @@
 """問題管理API - CRUD + ステータス遷移 + Known Error DB"""
+
 import uuid
 from typing import Annotated
 
@@ -64,9 +65,12 @@ async def list_problems(
 async def create_problem(
     data: ProblemCreate,
     db: Annotated[AsyncSession, Depends(get_db)],
-    current_user: Annotated[User, Depends(require_role(
-        UserRole.SYSTEM_ADMIN, UserRole.SERVICE_MANAGER, UserRole.INCIDENT_MANAGER
-    ))],
+    current_user: Annotated[
+        User,
+        Depends(
+            require_role(UserRole.SYSTEM_ADMIN, UserRole.SERVICE_MANAGER, UserRole.INCIDENT_MANAGER)
+        ),
+    ],
 ):
     """問題作成"""
     problem = await problem_service.create_problem(db, data.model_dump(exclude_none=True))
@@ -92,9 +96,12 @@ async def update_problem(
     problem_id: uuid.UUID,
     data: ProblemUpdate,
     db: Annotated[AsyncSession, Depends(get_db)],
-    current_user: Annotated[User, Depends(require_role(
-        UserRole.SYSTEM_ADMIN, UserRole.SERVICE_MANAGER, UserRole.INCIDENT_MANAGER
-    ))],
+    current_user: Annotated[
+        User,
+        Depends(
+            require_role(UserRole.SYSTEM_ADMIN, UserRole.SERVICE_MANAGER, UserRole.INCIDENT_MANAGER)
+        ),
+    ],
 ):
     """問題更新"""
     result = await db.execute(select(Problem).where(Problem.problem_id == problem_id))
@@ -114,9 +121,12 @@ async def transition_problem_status(
     problem_id: uuid.UUID,
     transition: ProblemStatusTransition,
     db: Annotated[AsyncSession, Depends(get_db)],
-    current_user: Annotated[User, Depends(require_role(
-        UserRole.SYSTEM_ADMIN, UserRole.SERVICE_MANAGER, UserRole.INCIDENT_MANAGER
-    ))],
+    current_user: Annotated[
+        User,
+        Depends(
+            require_role(UserRole.SYSTEM_ADMIN, UserRole.SERVICE_MANAGER, UserRole.INCIDENT_MANAGER)
+        ),
+    ],
 ):
     """問題ステータス遷移"""
     result = await db.execute(select(Problem).where(Problem.problem_id == problem_id))
@@ -138,9 +148,12 @@ async def set_known_error(
     problem_id: uuid.UUID,
     data: KnownErrorUpdate,
     db: Annotated[AsyncSession, Depends(get_db)],
-    current_user: Annotated[User, Depends(require_role(
-        UserRole.SYSTEM_ADMIN, UserRole.SERVICE_MANAGER, UserRole.INCIDENT_MANAGER
-    ))],
+    current_user: Annotated[
+        User,
+        Depends(
+            require_role(UserRole.SYSTEM_ADMIN, UserRole.SERVICE_MANAGER, UserRole.INCIDENT_MANAGER)
+        ),
+    ],
 ):
     """既知エラー（Known Error DB）登録"""
     result = await db.execute(select(Problem).where(Problem.problem_id == problem_id))

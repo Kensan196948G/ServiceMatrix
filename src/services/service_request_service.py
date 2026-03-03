@@ -1,4 +1,5 @@
 """サービスリクエスト管理ビジネスロジック"""
+
 import uuid
 from datetime import UTC, datetime
 from typing import Any
@@ -66,9 +67,7 @@ async def get_service_requests(
 
 async def get_service_request(db: AsyncSession, request_id: uuid.UUID) -> ServiceRequest | None:
     """IDでサービスリクエストを取得"""
-    result = await db.execute(
-        select(ServiceRequest).where(ServiceRequest.request_id == request_id)
-    )
+    result = await db.execute(select(ServiceRequest).where(ServiceRequest.request_id == request_id))
     return result.scalar_one_or_none()
 
 

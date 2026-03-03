@@ -3,13 +3,39 @@
 # run-claude.sh - Claude Code 起動スクリプト
 # 生成元: Claude-EdgeChromeDevTools v1.3.0
 # プロジェクト: ServiceMatrix
-# DevToolsポート: 9223
+# DevToolsポート: 9222
 # ============================================================
 set -euo pipefail
 
 PROJECT_ROOT="/mnt/LinuxHDD/ServiceMatrix"
-DEVTOOLS_PORT=9223
-SESSION_NAME="claude-ServiceMatrix-9223"
+DEVTOOLS_PORT=9222
+SESSION_NAME="claude-ServiceMatrix-9222"
+
+# --- ログ設定 ---
+LOG_DIR="$PROJECT_ROOT/logs"
+MCP_LOG_DIR="$LOG_DIR/mcp"
+LOG_TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+SESSION_LOG="$LOG_DIR/claude-session-$LOG_TIMESTAMP.log"
+
+mkdir -p "$LOG_DIR" "$MCP_LOG_DIR"
+
+# stdout + stderr をファイルとターミナル両方に出力
+exec > >(tee -a "$SESSION_LOG") 2>&1
+
+# --- ログローテーション (30日超を削除) ---
+find "$LOG_DIR" -maxdepth 1 -name "claude-session-*.log" -mtime +30 -delete 2>/dev/null || true
+find "$MCP_LOG_DIR" -name "mcp-health-*.log" -mtime +30 -delete 2>/dev/null || true
+
+# --- 月次アーカイブ ---
+ARCHIVE_DIR="$LOG_DIR/archive"
+PREV_MONTH=$(date -d "last month" +%Y-%m 2>/dev/null || date -v-1m +%Y-%m 2>/dev/null)
+if [ -n "$PREV_MONTH" ]; then
+    ARCHIVE_FILES=$(find "$LOG_DIR" -maxdepth 1 -name "claude-session-${PREV_MONTH}*.log" 2>/dev/null)
+    if [ -n "$ARCHIVE_FILES" ]; then
+        mkdir -p "$ARCHIVE_DIR"
+        zip -j "${ARCHIVE_DIR}/${PREV_MONTH}.zip" $ARCHIVE_FILES 2>/dev/null && rm -f $ARCHIVE_FILES
+    fi
+fi
 
 # --- 環境変数設定 ---
 export CLAUDE_CHROME_DEBUG_PORT="$DEVTOOLS_PORT"
@@ -613,9 +639,11 @@ while true; do
         echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
         echo "$INIT_PROMPT"
         echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-        claude --dangerously-skip-permissions "$INIT_PROMPT" || true
+        # プロンプト付き対話モード: /dev/tty で TTY を確保しつつ INIT_PROMPT を初期メッセージとして送信
+        claude --dangerously-skip-permissions "$INIT_PROMPT" </dev/tty >/dev/tty 2>&1 || true
     else
-        claude --dangerously-skip-permissions || true
+        # 対話モード: exec tee によるstdoutリダイレクト迂回のため /dev/tty を使用
+        claude --dangerously-skip-permissions </dev/tty >/dev/tty 2>&1 || true
     fi
     echo ""
     echo "🔄 Claude Code が終了しました。再起動モードを選択してください:"

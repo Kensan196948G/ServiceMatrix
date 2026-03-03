@@ -1,4 +1,5 @@
 """AIトリアージサービス - キーワードベース優先度・カテゴリ自動判定"""
+
 import uuid as _uuid
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
@@ -142,13 +143,12 @@ class AITriageService:
         provider = get_triage_provider()
         return await provider.analyze(title, description)
 
-    async def apply_triage_to_incident(
-        self, db: AsyncSession, incident_id: str
-    ) -> AITriageResult:
+    async def apply_triage_to_incident(self, db: AsyncSession, incident_id: str) -> AITriageResult:
         """インシデントを取得してトリアージ実行・結果を保存する"""
         result = await db.execute(
             select(Incident).where(
-                Incident.incident_id == _uuid.UUID(incident_id) if isinstance(incident_id, str)
+                Incident.incident_id == _uuid.UUID(incident_id)
+                if isinstance(incident_id, str)
                 else incident_id
             )
         )

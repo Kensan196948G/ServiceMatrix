@@ -1,4 +1,5 @@
 """インシデント管理API - CRUD + ステータス遷移 + SLA"""
+
 import uuid
 from typing import Annotated
 
@@ -23,8 +24,12 @@ from src.services.ai_triage_service import ai_triage_service
 router = APIRouter(prefix="/incidents", tags=["incidents"])
 
 
-@router.get("", response_model=PaginatedResponse[IncidentResponse], summary="インシデント一覧取得",
-            description="フィルタ・ページネーション対応のインシデント一覧を返します。")
+@router.get(
+    "",
+    response_model=PaginatedResponse[IncidentResponse],
+    summary="インシデント一覧取得",
+    description="フィルタ・ページネーション対応のインシデント一覧を返します。",
+)
 async def list_incidents(
     db: Annotated[AsyncSession, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
@@ -56,17 +61,28 @@ async def list_incidents(
     )
 
 
-@router.post("", response_model=IncidentResponse, status_code=status.HTTP_201_CREATED,
-             summary="インシデント作成",
-             description="新規インシデントを作成します。SLA自動計算・優先度設定に対応。")
+@router.post(
+    "",
+    response_model=IncidentResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="インシデント作成",
+    description="新規インシデントを作成します。SLA自動計算・優先度設定に対応。",
+)
 async def create_incident(
     data: IncidentCreate,
     background_tasks: BackgroundTasks,
     db: Annotated[AsyncSession, Depends(get_db)],
-    current_user: Annotated[User, Depends(require_role(
-        UserRole.SYSTEM_ADMIN, UserRole.SERVICE_MANAGER,
-        UserRole.INCIDENT_MANAGER, UserRole.OPERATOR
-    ))],
+    current_user: Annotated[
+        User,
+        Depends(
+            require_role(
+                UserRole.SYSTEM_ADMIN,
+                UserRole.SERVICE_MANAGER,
+                UserRole.INCIDENT_MANAGER,
+                UserRole.OPERATOR,
+            )
+        ),
+    ],
 ):
     """インシデント作成"""
     incident = await incident_service.create_incident(db, data.model_dump(exclude_none=True))
@@ -76,17 +92,19 @@ async def create_incident(
     return incident
 
 
-@router.get("/{incident_id}", response_model=IncidentResponse, summary="インシデント詳細取得",
-            description="指定されたIDのインシデント詳細を返します。")
+@router.get(
+    "/{incident_id}",
+    response_model=IncidentResponse,
+    summary="インシデント詳細取得",
+    description="指定されたIDのインシデント詳細を返します。",
+)
 async def get_incident(
     incident_id: uuid.UUID,
     db: Annotated[AsyncSession, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
 ):
     """インシデント詳細取得"""
-    result = await db.execute(
-        select(Incident).where(Incident.incident_id == incident_id)
-    )
+    result = await db.execute(select(Incident).where(Incident.incident_id == incident_id))
     incident = result.scalar_one_or_none()
     if not incident:
         raise HTTPException(
@@ -95,16 +113,27 @@ async def get_incident(
     return incident
 
 
-@router.patch("/{incident_id}", response_model=IncidentResponse, summary="インシデント更新",
-              description="指定されたIDのインシデントを部分更新します。")
+@router.patch(
+    "/{incident_id}",
+    response_model=IncidentResponse,
+    summary="インシデント更新",
+    description="指定されたIDのインシデントを部分更新します。",
+)
 async def update_incident(
     incident_id: uuid.UUID,
     data: IncidentUpdate,
     db: Annotated[AsyncSession, Depends(get_db)],
-    current_user: Annotated[User, Depends(require_role(
-        UserRole.SYSTEM_ADMIN, UserRole.SERVICE_MANAGER,
-        UserRole.INCIDENT_MANAGER, UserRole.OPERATOR
-    ))],
+    current_user: Annotated[
+        User,
+        Depends(
+            require_role(
+                UserRole.SYSTEM_ADMIN,
+                UserRole.SERVICE_MANAGER,
+                UserRole.INCIDENT_MANAGER,
+                UserRole.OPERATOR,
+            )
+        ),
+    ],
 ):
     """インシデント更新"""
     result = await db.execute(select(Incident).where(Incident.incident_id == incident_id))
@@ -121,17 +150,27 @@ async def update_incident(
     return incident
 
 
-@router.post("/{incident_id}/transitions", response_model=IncidentResponse,
-             summary="インシデントステータス遷移",
-             description="インシデントのステータスをITILワークフローに従って遷移させます。")
+@router.post(
+    "/{incident_id}/transitions",
+    response_model=IncidentResponse,
+    summary="インシデントステータス遷移",
+    description="インシデントのステータスをITILワークフローに従って遷移させます。",
+)
 async def transition_incident_status(
     incident_id: uuid.UUID,
     transition: IncidentStatusTransition,
     db: Annotated[AsyncSession, Depends(get_db)],
-    current_user: Annotated[User, Depends(require_role(
-        UserRole.SYSTEM_ADMIN, UserRole.SERVICE_MANAGER,
-        UserRole.INCIDENT_MANAGER, UserRole.OPERATOR
-    ))],
+    current_user: Annotated[
+        User,
+        Depends(
+            require_role(
+                UserRole.SYSTEM_ADMIN,
+                UserRole.SERVICE_MANAGER,
+                UserRole.INCIDENT_MANAGER,
+                UserRole.OPERATOR,
+            )
+        ),
+    ],
 ):
     """インシデントステータス遷移"""
     result = await db.execute(select(Incident).where(Incident.incident_id == incident_id))

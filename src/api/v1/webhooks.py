@@ -1,4 +1,5 @@
 """GitHub Webhook受信エンドポイント"""
+
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -30,6 +31,7 @@ async def github_webhook(
             )
 
     import json
+
     try:
         payload = json.loads(payload_bytes)
     except Exception as exc:

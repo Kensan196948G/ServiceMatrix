@@ -1,4 +1,5 @@
 """根本原因分析（RCA）Pydanticスキーマ"""
+
 from pydantic import BaseModel
 
 

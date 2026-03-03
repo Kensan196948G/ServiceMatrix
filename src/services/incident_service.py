@@ -1,4 +1,5 @@
 """インシデント管理ビジネスロジック - SLAタイマー・優先度・ステータス遷移"""
+
 import re
 from datetime import UTC, datetime, timedelta
 from typing import Any

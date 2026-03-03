@@ -1,4 +1,5 @@
 """問題管理モデル"""
+
 import uuid
 from datetime import datetime
 
@@ -11,20 +12,19 @@ from src.models.base import Base, TimestampMixin
 
 class Problem(Base, TimestampMixin):
     """問題管理テーブル - Known Error DB対応"""
+
     __tablename__ = "problems"
     __table_args__ = (
         CheckConstraint(
             "status IN ('New','Under_Investigation','Known_Error','Resolved','Closed')",
-            name="chk_problem_status"
+            name="chk_problem_status",
         ),
     )
 
     problem_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
-    problem_number: Mapped[str] = mapped_column(
-        String(20), nullable=False, unique=True, index=True
-    )
+    problem_number: Mapped[str] = mapped_column(String(20), nullable=False, unique=True, index=True)
     title: Mapped[str] = mapped_column(String(500), nullable=False)
     description: Mapped[str | None] = mapped_column(Text)
     root_cause: Mapped[str | None] = mapped_column(Text)

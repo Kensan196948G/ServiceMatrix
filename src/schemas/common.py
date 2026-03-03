@@ -1,4 +1,5 @@
 """共通Pydanticスキーマ - ページネーション等"""
+
 from typing import TypeVar
 
 from pydantic import BaseModel, Field

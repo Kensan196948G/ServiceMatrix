@@ -1,4 +1,5 @@
 """SQLAlchemy DeclarativeBase + 共通ミックスイン"""
+
 import uuid
 from datetime import UTC, datetime
 
@@ -13,6 +14,7 @@ class Base(DeclarativeBase):
 
 class UUIDMixin:
     """UUID主キーミックスイン"""
+
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         primary_key=True,
@@ -23,6 +25,7 @@ class UUIDMixin:
 
 class TimestampMixin:
     """タイムスタンプ自動設定ミックスイン"""
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=lambda: datetime.now(UTC),

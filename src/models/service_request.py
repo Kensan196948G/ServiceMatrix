@@ -1,4 +1,5 @@
 """サービスリクエスト管理モデル"""
+
 import uuid
 from datetime import datetime
 
@@ -11,22 +12,21 @@ from src.models.base import Base, TimestampMixin
 
 class ServiceRequest(Base, TimestampMixin):
     """サービスリクエストテーブル"""
+
     __tablename__ = "service_requests"
     __table_args__ = (
         CheckConstraint(
             "status IN ("
             "'New','Pending_Approval','Approved','In_Progress','Fulfilled','Rejected','Cancelled'"
             ")",
-            name="chk_sr_status"
+            name="chk_sr_status",
         ),
     )
 
     request_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
-    request_number: Mapped[str] = mapped_column(
-        String(20), nullable=False, unique=True, index=True
-    )
+    request_number: Mapped[str] = mapped_column(String(20), nullable=False, unique=True, index=True)
     title: Mapped[str] = mapped_column(String(500), nullable=False)
     description: Mapped[str | None] = mapped_column(Text)
     status: Mapped[str] = mapped_column(String(30), nullable=False, default="New")

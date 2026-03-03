@@ -1,4 +1,5 @@
 """SLA自動監視バックグラウンドエンジン"""
+
 import asyncio
 from datetime import UTC, datetime
 

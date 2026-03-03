@@ -1,4 +1,5 @@
 """CMDB構成管理API"""
+
 import uuid
 from typing import Annotated
 

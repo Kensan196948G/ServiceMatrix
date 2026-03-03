@@ -1,4 +1,5 @@
 """アラート通知サービス（GitHub Issues・Webhook）"""
+
 import httpx
 import structlog
 
@@ -96,9 +97,7 @@ class NotificationService:
         }
         try:
             async with httpx.AsyncClient() as client:
-                response = await client.post(
-                    settings.alert_webhook_url, json=payload, timeout=10
-                )
+                response = await client.post(settings.alert_webhook_url, json=payload, timeout=10)
                 response.raise_for_status()
                 logger.info("webhook_sent", incident=incident_number)
                 return {"status": "sent", "status_code": response.status_code}
