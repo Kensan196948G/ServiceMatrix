@@ -141,3 +141,144 @@ async def test_incident_sla_fields_set(client, auth_headers):
     data = resp.json()
     assert data["sla_response_due_at"] is not None
     assert data["sla_resolution_due_at"] is not None
+
+
+# ─── インシデント詳細取得(成功)テスト ────────────────────────────────────────
+
+async def test_get_incident_success(client, auth_headers):
+    """作成したインシデントの詳細取得 → 200"""
+    create_resp = await client.post(
+        "/api/v1/incidents",
+        json={"title": "詳細取得テスト", "priority": "P3"},
+        headers=auth_headers,
+    )
+    assert create_resp.status_code == 201
+    inc_id = create_resp.json()["incident_id"]
+
+    resp = await client.get(f"/api/v1/incidents/{inc_id}", headers=auth_headers)
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["incident_id"] == inc_id
+    assert data["title"] == "詳細取得テスト"
+
+
+# ─── インシデント更新テスト ──────────────────────────────────────────────────
+
+async def test_update_incident_success(client, auth_headers):
+    """PATCH /incidents/{id} → 200, フィールド更新確認"""
+    create_resp = await client.post(
+        "/api/v1/incidents",
+        json={"title": "更新テスト", "priority": "P2"},
+        headers=auth_headers,
+    )
+    assert create_resp.status_code == 201
+    inc_id = create_resp.json()["incident_id"]
+
+    update_resp = await client.patch(
+        f"/api/v1/incidents/{inc_id}",
+        json={"description": "更新された説明", "category": "Network"},
+        headers=auth_headers,
+    )
+    assert update_resp.status_code == 200
+    data = update_resp.json()
+    assert data["description"] == "更新された説明"
+    assert data["category"] == "Network"
+
+
+async def test_update_incident_not_found(client, auth_headers):
+    """存在しないIDの更新 → 404"""
+    import uuid
+    resp = await client.patch(
+        f"/api/v1/incidents/{uuid.uuid4()}",
+        json={"description": "存在しない"},
+        headers=auth_headers,
+    )
+    assert resp.status_code == 404
+
+
+# ─── ステータス遷移失敗テスト ────────────────────────────────────────────────
+
+async def test_incident_invalid_transition(client, auth_headers):
+    """無効なステータス遷移 → 422"""
+    create_resp = await client.post(
+        "/api/v1/incidents",
+        json={"title": "無効遷移テスト", "priority": "P3"},
+        headers=auth_headers,
+    )
+    assert create_resp.status_code == 201
+    inc_id = create_resp.json()["incident_id"]
+
+    # New → Closed は直接不可
+    resp = await client.post(
+        f"/api/v1/incidents/{inc_id}/transitions",
+        json={"new_status": "Closed"},
+        headers=auth_headers,
+    )
+    assert resp.status_code == 422
+
+
+async def test_transition_incident_not_found(client, auth_headers):
+    """存在しないIDの遷移 → 404"""
+    import uuid
+    resp = await client.post(
+        f"/api/v1/incidents/{uuid.uuid4()}/transitions",
+        json={"new_status": "Acknowledged"},
+        headers=auth_headers,
+    )
+    assert resp.status_code == 404
+
+
+# ─── フルライフサイクルテスト ────────────────────────────────────────────────
+
+async def test_incident_full_lifecycle(client, auth_headers):
+    """New → Acknowledged → In_Progress → Resolved → Closed"""
+    create_resp = await client.post(
+        "/api/v1/incidents",
+        json={"title": "ライフサイクルテスト", "priority": "P2"},
+        headers=auth_headers,
+    )
+    inc_id = create_resp.json()["incident_id"]
+
+    for new_status in ["Acknowledged", "In_Progress", "Resolved", "Closed"]:
+        resp = await client.post(
+            f"/api/v1/incidents/{inc_id}/transitions",
+            json={"new_status": new_status},
+            headers=auth_headers,
+        )
+        assert resp.status_code == 200
+        assert resp.json()["status"] == new_status
+
+    final = await client.get(f"/api/v1/incidents/{inc_id}", headers=auth_headers)
+    data = final.json()
+    assert data["status"] == "Closed"
+    assert data["acknowledged_at"] is not None
+    assert data["resolved_at"] is not None
+    assert data["closed_at"] is not None
+
+
+# ─── 一覧フィルタテスト ─────────────────────────────────────────────────────
+
+async def test_list_incidents_with_status_filter(client, auth_headers):
+    """GET /incidents?status=New → statusフィルタ確認"""
+    await client.post(
+        "/api/v1/incidents",
+        json={"title": "フィルタテスト", "priority": "P3"},
+        headers=auth_headers,
+    )
+    resp = await client.get("/api/v1/incidents?status=New", headers=auth_headers)
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["total"] >= 1
+
+
+async def test_list_incidents_with_priority_filter(client, auth_headers):
+    """GET /incidents?priority=P1 → priorityフィルタ確認"""
+    await client.post(
+        "/api/v1/incidents",
+        json={"title": "P1フィルタテスト", "priority": "P1"},
+        headers=auth_headers,
+    )
+    resp = await client.get("/api/v1/incidents?priority=P1", headers=auth_headers)
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["total"] >= 1

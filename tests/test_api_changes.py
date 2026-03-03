@@ -2,7 +2,7 @@
 import uuid
 import pytest
 import pytest_asyncio
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 pytestmark = pytest.mark.asyncio
 
@@ -152,3 +152,212 @@ async def test_unauthorized_change(client):
     """認証ヘッダーなし → 401"""
     resp = await client.get("/api/v1/changes")
     assert resp.status_code == 401
+
+
+# ─── 詳細取得(成功)テスト ─────────────────────────────────────────────────────
+
+async def test_get_change_success(client, auth_headers):
+    """GET /changes/{id} → 200, 作成した変更が取得できる"""
+    create_resp = await client.post(
+        "/api/v1/changes",
+        json={"title": "詳細取得テスト", "change_type": "Standard"},
+        headers=auth_headers,
+    )
+    assert create_resp.status_code == 201
+    change_id = create_resp.json()["change_id"]
+
+    resp = await client.get(f"/api/v1/changes/{change_id}", headers=auth_headers)
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["change_id"] == change_id
+    assert data["title"] == "詳細取得テスト"
+
+
+# ─── 更新テスト ──────────────────────────────────────────────────────────────
+
+async def test_update_change_success(client, auth_headers):
+    """PATCH /changes/{id} → 200, フィールド更新確認"""
+    create_resp = await client.post(
+        "/api/v1/changes",
+        json={"title": "更新テスト変更", "change_type": "Normal"},
+        headers=auth_headers,
+    )
+    assert create_resp.status_code == 201
+    change_id = create_resp.json()["change_id"]
+
+    update_resp = await client.patch(
+        f"/api/v1/changes/{change_id}",
+        json={"description": "更新されたdescription", "impact_level": "High"},
+        headers=auth_headers,
+    )
+    assert update_resp.status_code == 200
+    data = update_resp.json()
+    assert data["description"] == "更新されたdescription"
+    assert data["impact_level"] == "High"
+
+
+async def test_update_change_not_found(client, auth_headers):
+    """存在しないIDの更新 → 404"""
+    import uuid
+    resp = await client.patch(
+        f"/api/v1/changes/{uuid.uuid4()}",
+        json={"description": "更新"},
+        headers=auth_headers,
+    )
+    assert resp.status_code == 404
+
+
+# ─── ステータス遷移失敗テスト ────────────────────────────────────────────────
+
+async def test_change_invalid_transition(client, auth_headers):
+    """無効なステータス遷移 → 422"""
+    create_resp = await client.post(
+        "/api/v1/changes",
+        json={"title": "無効遷移テスト", "change_type": "Normal"},
+        headers=auth_headers,
+    )
+    assert create_resp.status_code == 201
+    change_id = create_resp.json()["change_id"]
+
+    # Draft → Approved は無効
+    resp = await client.post(
+        f"/api/v1/changes/{change_id}/transitions",
+        json={"new_status": "Approved"},
+        headers=auth_headers,
+    )
+    assert resp.status_code == 422
+
+
+async def test_transition_change_not_found(client, auth_headers):
+    """存在しないIDの遷移 → 404"""
+    import uuid
+    resp = await client.post(
+        f"/api/v1/changes/{uuid.uuid4()}/transitions",
+        json={"new_status": "Submitted"},
+        headers=auth_headers,
+    )
+    assert resp.status_code == 404
+
+
+# ─── CAB承認失敗テスト ───────────────────────────────────────────────────────
+
+async def test_cab_approval_not_in_review(client, auth_headers):
+    """CAB_Review以外でのCAB承認 → 422"""
+    create_resp = await client.post(
+        "/api/v1/changes",
+        json={"title": "CABエラーテスト", "change_type": "Normal"},
+        headers=auth_headers,
+    )
+    assert create_resp.status_code == 201
+    change_id = create_resp.json()["change_id"]
+
+    # Draft状態でCAB承認は無効
+    resp = await client.post(
+        f"/api/v1/changes/{change_id}/cab-approval",
+        json={"approved": True},
+        headers=auth_headers,
+    )
+    assert resp.status_code == 422
+
+
+async def test_cab_rejection(client, auth_headers):
+    """CAB却下フロー: Draft → Submitted → CAB_Review → Rejected"""
+    create_resp = await client.post(
+        "/api/v1/changes",
+        json={"title": "CAB却下テスト", "change_type": "Normal"},
+        headers=auth_headers,
+    )
+    change_id = create_resp.json()["change_id"]
+
+    await client.post(
+        f"/api/v1/changes/{change_id}/transitions",
+        json={"new_status": "Submitted"}, headers=auth_headers,
+    )
+    await client.post(
+        f"/api/v1/changes/{change_id}/transitions",
+        json={"new_status": "CAB_Review"}, headers=auth_headers,
+    )
+
+    cab_resp = await client.post(
+        f"/api/v1/changes/{change_id}/cab-approval",
+        json={"approved": False, "notes": "リスクが高い"},
+        headers=auth_headers,
+    )
+    assert cab_resp.status_code == 200
+    assert cab_resp.json()["status"] == "Rejected"
+
+
+async def test_cab_approval_not_found(client, auth_headers):
+    """存在しないIDのCAB承認 → 404"""
+    import uuid
+    resp = await client.post(
+        f"/api/v1/changes/{uuid.uuid4()}/cab-approval",
+        json={"approved": True},
+        headers=auth_headers,
+    )
+    assert resp.status_code == 404
+
+
+# ─── 一覧フィルタテスト ─────────────────────────────────────────────────────
+
+async def test_list_changes_with_status_filter(client, auth_headers):
+    """GET /changes?status=Draft → statusフィルタ確認"""
+    await client.post(
+        "/api/v1/changes",
+        json={"title": "フィルタテスト", "change_type": "Standard"},
+        headers=auth_headers,
+    )
+    resp = await client.get("/api/v1/changes?status=Draft", headers=auth_headers)
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["total"] >= 1
+    for item in data["items"]:
+        assert item["status"] == "Draft"
+
+
+# ─── リスク自動評価エンドポイントテスト ──────────────────────────────────────
+
+async def test_risk_assessment_endpoint(client, auth_headers):
+    """POST /changes/{id}/risk-assessment → 200"""
+    from src.services.change_risk_service import RiskAssessmentResult
+
+    create_resp = await client.post(
+        "/api/v1/changes",
+        json={"title": "リスク評価テスト", "change_type": "Emergency", "impact_level": "High"},
+        headers=auth_headers,
+    )
+    assert create_resp.status_code == 201
+    change_id = create_resp.json()["change_id"]
+
+    mock_result = RiskAssessmentResult(
+        change_id=change_id,
+        total_score=75,
+        risk_level="High",
+        factors=[],
+        recommendations=["テスト推奨事項"],
+        maintenance_window_required=True,
+    )
+
+    with patch(
+        "src.api.v1.changes.change_risk_service.assess_risk",
+        new=AsyncMock(return_value=mock_result),
+    ):
+        resp = await client.post(
+            f"/api/v1/changes/{change_id}/risk-assessment",
+            headers=auth_headers,
+        )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "total_score" in data
+    assert "risk_level" in data
+    assert "factors" in data
+
+
+async def test_risk_assessment_not_found(client, auth_headers):
+    """存在しないIDのリスク評価 → 404"""
+    import uuid
+    resp = await client.post(
+        f"/api/v1/changes/{uuid.uuid4()}/risk-assessment",
+        headers=auth_headers,
+    )
+    assert resp.status_code == 404
