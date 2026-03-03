@@ -24,7 +24,6 @@ from sqlalchemy.pool import StaticPool
 from src.models.incident import Incident
 from src.services.sla_monitor_service import SLAMonitorService
 
-
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
 
 
@@ -170,26 +169,6 @@ async def test_monitor_loop_exception():
     service = SLAMonitorService()
     service.running = True
 
-    call_count = 0
-
-    async def fail_then_stop(*args, **kwargs):
-        nonlocal call_count
-        call_count += 1
-        if call_count == 1:
-            raise Exception("Transient error")
-        service.running = False
-        return mock_session
-
-    mock_session = AsyncMock()
-    mock_session_ctx = AsyncMock()
-
-    async def side_effect_factory():
-        nonlocal call_count
-        call_count += 1
-        if call_count == 1:
-            raise Exception("DB error")
-        service.running = False
-
     # 初回で例外、2回目で停止のパターン
     with (
         patch(
@@ -243,7 +222,7 @@ async def test_response_breach_already_marked(db: AsyncSession):
         "src.services.sla_monitor_service.audit_service.record_audit_log",
         new=AsyncMock(),
     ):
-        count = await service.check_sla_breaches(db)
+        await service.check_sla_breaches(db)
 
     # 既にbreachedなのでカウントに含まれない
     assert incident.sla_breached is True
