@@ -1,10 +1,10 @@
-"""SLA監視API - サマリー・違反一覧・手動チェック"""
+"""SLA監視API - サマリー・違反一覧・警告一覧・個別ステータス・手動チェック"""
 
 import json
 from datetime import UTC, datetime
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -33,6 +33,15 @@ async def get_sla_summary(
     return result
 
 
+@router.get("/warnings")
+async def list_sla_warnings(
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """SLA事前警告対象インシデント一覧（70%/90%到達済み、通知なし照会のみ）"""
+    warnings = await sla_monitor.get_active_warnings(db)
+    return {"warnings": warnings, "count": len(warnings)}
+
+
 @router.get("/breaches")
 async def list_sla_breaches(
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -51,10 +60,28 @@ async def list_sla_breaches(
     return incidents
 
 
+@router.get("/status/{incident_id}")
+async def get_sla_status(
+    incident_id: str,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """個別インシデントのSLAステータス詳細（レスポンス・解決SLA進捗率・警告レベル）"""
+    status = await sla_monitor.get_sla_status(db, incident_id)
+    if status is None:
+        raise HTTPException(status_code=404, detail="Incident not found")
+    return status
+
+
 @router.post("/check")
 async def manual_sla_check(
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
-    """手動SLAチェック実行（管理者用）"""
-    await sla_monitor.check_sla_breaches(db)
-    return {"checked": True, "timestamp": datetime.now(UTC).isoformat()}
+    """手動SLAチェック実行（管理者用） - 違反検知 + 警告チェック"""
+    breach_count = await sla_monitor.check_sla_breaches(db)
+    warnings = await sla_monitor.check_sla_warnings(db)
+    return {
+        "checked": True,
+        "timestamp": datetime.now(UTC).isoformat(),
+        "breaches_detected": breach_count,
+        "warnings_detected": len(warnings),
+    }

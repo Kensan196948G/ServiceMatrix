@@ -67,6 +67,11 @@ async def test_check_sla(client, auth_headers):
     with patch(
         "src.services.sla_monitor_service.sla_monitor.check_sla_breaches",
         new_callable=AsyncMock,
+        return_value=0,
+    ), patch(
+        "src.services.sla_monitor_service.sla_monitor.check_sla_warnings",
+        new_callable=AsyncMock,
+        return_value=[],
     ):
         resp = await client.post("/api/v1/sla/check")
     assert resp.status_code == 200
@@ -80,6 +85,11 @@ async def test_sla_check_creates_breaches(client, auth_headers):
     with patch(
         "src.services.sla_monitor_service.sla_monitor.check_sla_breaches",
         new_callable=AsyncMock,
+        return_value=2,
+    ), patch(
+        "src.services.sla_monitor_service.sla_monitor.check_sla_warnings",
+        new_callable=AsyncMock,
+        return_value=[{"incident_id": "test"}],
     ):
         resp = await client.post("/api/v1/sla/check")
     assert resp.status_code == 200

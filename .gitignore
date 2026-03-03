@@ -73,12 +73,12 @@ tmp/
 temp/
 .tmp/
 
-# Claude Code
-.claude/
-coverage.xml
-
 # Next.js
 .next/
 out/
 next-env.d.ts
 *.tsbuildinfo
+
+# Claude Code
+.claude/
+coverage.xml
