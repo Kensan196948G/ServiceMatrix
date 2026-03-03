@@ -76,3 +76,56 @@ class ImpactAnalysisResponse(BaseModel):
     ci_name: str
     direct_dependents: list[CIResponse]
     transitive_count: int
+
+
+# --- グラフAPI用スキーマ ---
+
+
+class GraphNode(BaseModel):
+    """グラフ上のCI（ノード）表現"""
+
+    id: str
+    label: str
+    ci_type: str
+    status: str
+    attributes: dict | None = None
+
+
+class GraphEdge(BaseModel):
+    """グラフ上のCI関係（エッジ）表現"""
+
+    id: str
+    source: str
+    target: str
+    relationship_type: str
+
+
+class GraphResponse(BaseModel):
+    """グラフ構造レスポンス"""
+
+    nodes: list[GraphNode]
+    edges: list[GraphEdge]
+    total_nodes: int
+    total_edges: int
+
+
+class BatchImpactRequest(BaseModel):
+    """バッチ影響分析リクエスト"""
+
+    ci_ids: list[uuid.UUID] = Field(..., min_length=1, max_length=20)
+
+
+class BatchImpactItem(BaseModel):
+    """バッチ影響分析の個別結果"""
+
+    ci_id: uuid.UUID
+    ci_name: str
+    direct_dependents: list[CIResponse]
+    transitive_count: int
+
+
+class BatchImpactResponse(BaseModel):
+    """バッチ影響分析レスポンス"""
+
+    items: list[BatchImpactItem]
+    total_affected: int
