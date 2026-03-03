@@ -2,6 +2,7 @@
 
 from fastapi import APIRouter
 
+from src.api.v1.ai_triage import router as ai_triage_router
 from src.api.v1.audit import router as audit_router
 from src.api.v1.auth import router as auth_router
 from src.api.v1.changes import router as changes_router
@@ -24,3 +25,4 @@ api_router.include_router(service_requests_router)
 api_router.include_router(sla_router)
 api_router.include_router(webhooks_router)
 api_router.include_router(audit_router)
+api_router.include_router(ai_triage_router)

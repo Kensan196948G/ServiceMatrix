@@ -41,10 +41,11 @@ class Settings(BaseSettings):
     github_webhook_secret: str = ""
 
     # LLM設定
-    llm_provider: str = "keyword"  # "keyword" | "openai" | "azure_openai" | "ollama"
+    llm_provider: str = "keyword"  # "keyword" | "openai" | "claude" | "azure_openai" | "ollama"
     llm_model: str = "gpt-4o-mini"
     openai_api_key: str = ""  # noqa: S105
     openai_api_base: str = ""  # Azure OpenAIのエンドポイントまたはOllamaのURL
+    anthropic_api_key: str = ""  # noqa: S105
 
     # アラート・通知設定
     github_token: str = ""  # noqa: S105

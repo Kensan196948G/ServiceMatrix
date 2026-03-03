@@ -1,8 +1,9 @@
-"""AIトリアージサービス - キーワードベース優先度・カテゴリ自動判定"""
+"""AIトリアージサービス - キーワードベース / Claude API / OpenAI 優先度・カテゴリ自動判定"""
 
 import uuid as _uuid
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from datetime import UTC, datetime
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -13,6 +14,17 @@ from src.models.incident import Incident
 
 logger = get_logger(__name__)
 
+# 有効な優先度・カテゴリ値
+VALID_PRIORITIES = {"Critical", "High", "Medium", "Low"}
+VALID_CATEGORIES = {
+    "Network",
+    "Database",
+    "Application",
+    "Security",
+    "Infrastructure",
+    "Unknown",
+}
+
 
 @dataclass
 class AITriageResult:
@@ -20,6 +32,8 @@ class AITriageResult:
     category: str  # Network/Database/Application/Security/Infrastructure/Unknown
     confidence: float  # 0.0-1.0
     reasoning: str
+    provider: str = "keyword"  # 使用されたプロバイダー名
+    timestamp: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
 
 
 class TriageProvider(ABC):
@@ -51,6 +65,7 @@ class KeywordTriageProvider(TriageProvider):
             category=category,
             confidence=priority_confidence,
             reasoning=reasoning,
+            provider="keyword",
         )
 
     def _determine_priority(self, text: str) -> tuple[str, float, str]:
@@ -117,15 +132,67 @@ class OpenAITriageProvider(TriageProvider):
                 category=data.get("category", "Unknown"),
                 confidence=float(data.get("confidence", 0.5)),
                 reasoning=data.get("reasoning", "LLM triage"),
+                provider="openai",
             )
         except ImportError:
             logger.warning("openai package not installed; falling back to keyword triage")
             return await KeywordTriageProvider().analyze(title, description)
 
 
+class ClaudeTriageProvider(TriageProvider):
+    """Anthropic Claude API使用トリアージ"""
+
+    def __init__(self, api_key: str, model: str = "claude-sonnet-4-20250514"):
+        self.api_key = api_key
+        self.model = model
+
+    async def analyze(self, title: str, description: str | None) -> AITriageResult:
+        try:
+            import anthropic  # noqa: PLC0415
+
+            client = anthropic.AsyncAnthropic(api_key=self.api_key)
+
+            prompt = (
+                f"Triage this incident. Title: {title}. Description: {description or ''}.\n"
+                "Respond ONLY with valid JSON (no markdown): "
+                '{"priority": "Critical|High|Medium|Low", '
+                '"category": "Network|Database|Application|Security|Infrastructure|Unknown", '
+                '"confidence": 0.0-1.0, "reasoning": "string"}'
+            )
+            response = await client.messages.create(
+                model=self.model,
+                max_tokens=256,
+                messages=[{"role": "user", "content": prompt}],
+            )
+            import json  # noqa: PLC0415
+
+            content_text = response.content[0].text if response.content else "{}"
+            data = json.loads(content_text)
+
+            priority = data.get("priority", "Medium")
+            category = data.get("category", "Unknown")
+            if priority not in VALID_PRIORITIES:
+                priority = "Medium"
+            if category not in VALID_CATEGORIES:
+                category = "Unknown"
+
+            return AITriageResult(
+                priority=priority,
+                category=category,
+                confidence=float(data.get("confidence", 0.5)),
+                reasoning=data.get("reasoning", "Claude triage"),
+                provider="claude",
+            )
+        except ImportError:
+            logger.warning("anthropic package not installed; falling back to keyword triage")
+            return await KeywordTriageProvider().analyze(title, description)
+
+
 def get_triage_provider() -> TriageProvider:
     """設定に基づいてプロバイダーを返すファクトリ関数"""
     provider = settings.llm_provider
+    if provider == "claude" and settings.anthropic_api_key:
+        return ClaudeTriageProvider(settings.anthropic_api_key, settings.llm_model)
     if provider == "openai" and settings.openai_api_key:
         return OpenAITriageProvider(settings.openai_api_key, settings.llm_model)
     if provider in ("azure_openai", "ollama") and settings.openai_api_base:
@@ -177,6 +244,59 @@ class AITriageService:
             triage_result.category,
         )
         return triage_result
+
+    async def batch_triage(self, db: AsyncSession, incident_ids: list[str]) -> list[dict]:
+        """複数インシデントを一括トリアージする"""
+        results: list[dict] = []
+        for iid in incident_ids:
+            try:
+                triage_result = await self.apply_triage_to_incident(db, iid)
+                results.append(
+                    {
+                        "incident_id": iid,
+                        "priority": triage_result.priority,
+                        "category": triage_result.category,
+                        "confidence": triage_result.confidence,
+                        "reasoning": triage_result.reasoning,
+                        "success": True,
+                        "error": None,
+                    }
+                )
+            except Exception as exc:
+                logger.error("Batch triage failed for %s: %s", iid, exc)
+                results.append(
+                    {
+                        "incident_id": iid,
+                        "priority": "Unknown",
+                        "category": "Unknown",
+                        "confidence": 0.0,
+                        "reasoning": "",
+                        "success": False,
+                        "error": str(exc),
+                    }
+                )
+        return results
+
+    def get_provider_info(self) -> dict:
+        """現在のプロバイダー情報を返す"""
+        provider = get_triage_provider()
+        if isinstance(provider, ClaudeTriageProvider):
+            return {
+                "provider": "claude",
+                "model": provider.model,
+                "description": "Anthropic Claude APIによるAIトリアージ",
+            }
+        if isinstance(provider, OpenAITriageProvider):
+            return {
+                "provider": "openai",
+                "model": provider.model,
+                "description": "OpenAI APIによるAIトリアージ",
+            }
+        return {
+            "provider": "keyword",
+            "model": None,
+            "description": "キーワードベーストリアージ（LLMなし）",
+        }
 
 
 ai_triage_service = AITriageService()
