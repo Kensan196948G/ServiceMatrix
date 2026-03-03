@@ -177,3 +177,111 @@ async def test_system_admin_can_access_all(client: AsyncClient, auth_headers: di
     r3 = await client.get("/api/v1/auth/me", headers=auth_headers)
     assert r3.status_code == 200
 
+
+# ─── ログイン成功フロー（last_login_at更新確認） ────────────────────────────
+
+@pytest.mark.asyncio
+async def test_login_returns_both_tokens(client: AsyncClient, test_user: User, monkeypatch):
+    """ログイン成功でaccess_tokenとrefresh_tokenの両方を返す"""
+    monkeypatch.setattr("src.api.v1.auth.verify_password", _verify)
+    resp = await client.post("/api/v1/auth/login", json={
+        "username": "testadmin",
+        "password": "testpass123",
+    })
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "access_token" in data
+    assert "refresh_token" in data
+    assert data["token_type"] == "bearer"
+
+
+@pytest.mark.asyncio
+async def test_login_inactive_user(client: AsyncClient, db_session, monkeypatch):
+    """非アクティブユーザーのログインは403"""
+    inactive_user = User(
+        user_id=uuid.uuid4(),
+        username="inactiveuser",
+        email="inactive@test.com",
+        hashed_password=_make_hash("testpass123"),
+        role=UserRole.OPERATOR,
+        is_active=False,
+    )
+    db_session.add(inactive_user)
+    await db_session.flush()
+
+    monkeypatch.setattr("src.api.v1.auth.verify_password", _verify)
+    resp = await client.post("/api/v1/auth/login", json={
+        "username": "inactiveuser",
+        "password": "testpass123",
+    })
+    assert resp.status_code == 403
+
+
+# ─── リフレッシュトークンテスト ──────────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_refresh_token_success(client: AsyncClient, test_user: User, monkeypatch):
+    """有効なリフレッシュトークンで新しいトークンペアを取得"""
+    monkeypatch.setattr("src.api.v1.auth.verify_password", _verify)
+    login_resp = await client.post("/api/v1/auth/login", json={
+        "username": "testadmin",
+        "password": "testpass123",
+    })
+    assert login_resp.status_code == 200
+    refresh_tok = login_resp.json()["refresh_token"]
+
+    refresh_resp = await client.post("/api/v1/auth/refresh", json={
+        "refresh_token": refresh_tok,
+    })
+    assert refresh_resp.status_code == 200
+    data = refresh_resp.json()
+    assert "access_token" in data
+    assert "refresh_token" in data
+
+
+@pytest.mark.asyncio
+async def test_refresh_token_invalid(client: AsyncClient):
+    """無効なリフレッシュトークン → 401"""
+    resp = await client.post("/api/v1/auth/refresh", json={
+        "refresh_token": "invalid.refresh.token",
+    })
+    assert resp.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_refresh_with_access_token(client: AsyncClient, test_user: User, monkeypatch):
+    """アクセストークンをリフレッシュ用に使うと401（type != refresh）"""
+    monkeypatch.setattr("src.api.v1.auth.verify_password", _verify)
+    login_resp = await client.post("/api/v1/auth/login", json={
+        "username": "testadmin",
+        "password": "testpass123",
+    })
+    access_tok = login_resp.json()["access_token"]
+
+    resp = await client.post("/api/v1/auth/refresh", json={
+        "refresh_token": access_tok,
+    })
+    assert resp.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_refresh_inactive_user(client: AsyncClient, db_session, monkeypatch):
+    """リフレッシュ時にユーザーが非アクティブなら401"""
+    from src.core.security import create_refresh_token
+    user = User(
+        user_id=uuid.uuid4(),
+        username="refresh_inactive",
+        email="refresh_inactive@test.com",
+        hashed_password=_make_hash("testpass123"),
+        role=UserRole.OPERATOR,
+        is_active=False,
+    )
+    db_session.add(user)
+    await db_session.flush()
+
+    refresh_tok = create_refresh_token({"sub": str(user.user_id), "role": user.role.value})
+    resp = await client.post("/api/v1/auth/refresh", json={
+        "refresh_token": refresh_tok,
+    })
+    assert resp.status_code == 401
+
