@@ -42,3 +42,51 @@ class HashChainVerifyResponse(BaseModel):
     checked_count: int
     first_invalid_sequence: int | None
     message: str
+
+
+class ActionSummary(BaseModel):
+    action: str
+    count: int
+    resource_type: str | None = None
+
+
+class SecurityEventSummary(BaseModel):
+    period_start: datetime
+    period_end: datetime
+    auth_failures: int
+    privilege_escalations: int
+    total_events: int
+    top_actions: list[ActionSummary]
+
+
+class UserActivityItem(BaseModel):
+    user_id: uuid.UUID | None = None
+    username: str | None = None
+    user_role: str | None = None
+    action_count: int
+    last_activity: datetime | None = None
+
+
+class UserActivityResponse(BaseModel):
+    period_start: datetime
+    period_end: datetime
+    total_users: int
+    items: list[UserActivityItem]
+
+
+class ComplianceReportResponse(BaseModel):
+    period_start: datetime
+    period_end: datetime
+    total_logs: int
+    hash_chain_valid: bool
+    first_invalid_sequence: int | None = None
+    actions_by_type: list[ActionSummary]
+    top_users: list[UserActivityItem]
+    security_events: SecurityEventSummary
+
+
+class AuditExportResponse(BaseModel):
+    exported_at: datetime
+    total_records: int
+    filters_applied: dict
+    records: list[AuditLogResponse]
