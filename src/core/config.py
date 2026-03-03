@@ -52,6 +52,11 @@ class Settings(BaseSettings):
     alert_webhook_url: str = ""
     alert_webhook_enabled: bool = False
 
+    # SLAエンジン設定
+    sla_check_interval_seconds: int = 60
+    sla_warning_threshold_70: float = 0.70
+    sla_warning_threshold_90: float = 0.90
+
 
 @lru_cache
 def get_settings() -> Settings:

@@ -76,6 +76,51 @@ class NotificationService:
             logger.warning("github_issue_creation_failed", error=str(e), incident=incident_number)
             return None
 
+    async def notify_sla_warning(
+        self,
+        incident_number: str,
+        incident_title: str,
+        priority: str,
+        warning_level: str,
+        progress_percent: float,
+    ) -> dict:
+        """SLA事前警告通知を送信（Webhook経由）"""
+        results = {}
+        if settings.alert_webhook_enabled and settings.alert_webhook_url:
+            emoji = ":warning:" if warning_level == "warning_70" else ":rotating_light:"
+            text = (
+                f"{emoji} *SLA警告 ({warning_level})*\n"
+                f"インシデント: {incident_number} | {incident_title}\n"
+                f"優先度: {priority} | 進捗: {progress_percent}%"
+            )
+            payload = {
+                "text": text,
+                "incident_number": incident_number,
+                "priority": priority,
+                "warning_level": warning_level,
+                "progress_percent": progress_percent,
+            }
+            try:
+                async with httpx.AsyncClient() as client:
+                    response = await client.post(
+                        settings.alert_webhook_url, json=payload, timeout=10
+                    )
+                    response.raise_for_status()
+                    logger.info(
+                        "sla_warning_webhook_sent",
+                        incident=incident_number,
+                        level=warning_level,
+                    )
+                    results["webhook"] = {"status": "sent", "status_code": response.status_code}
+            except Exception as e:  # noqa: BLE001
+                logger.warning(
+                    "sla_warning_webhook_failed",
+                    error=str(e),
+                    incident=incident_number,
+                )
+                results["webhook"] = None
+        return results
+
     async def _send_webhook(
         self,
         incident_number: str,
