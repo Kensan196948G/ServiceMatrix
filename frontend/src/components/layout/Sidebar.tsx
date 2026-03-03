@@ -13,6 +13,7 @@ import {
   Search,
   ClipboardList,
   Settings,
+  Gauge,
   type LucideIcon,
 } from "lucide-react";
 
@@ -34,6 +35,7 @@ const navItems: NavItem[] = [
     href: "/service-requests",
     icon: ClipboardList,
   },
+  { label: "SLAダッシュボード", href: "/sla", icon: Gauge },
 ];
 
 export default function Sidebar() {

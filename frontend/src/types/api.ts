@@ -152,3 +152,63 @@ export interface DashboardStats {
   problems: number;
   service_requests: number;
 }
+
+// --- SLA監視 ---
+
+/** SLA優先度別達成率サマリー（1エントリ） */
+export interface SLAPrioritySummary {
+  total: number;
+  breached: number;
+  compliance_rate: number;
+}
+
+/** SLA達成率サマリー（優先度キー→サマリー値） */
+export type SLASummaryResponse = Record<string, SLAPrioritySummary>;
+
+/** SLA警告情報 */
+export interface SLAWarning {
+  incident_id: string;
+  incident_number: string;
+  title: string;
+  priority: "P1" | "P2" | "P3" | "P4";
+  sla_type: "response" | "resolution";
+  warning_level: "warning_70" | "warning_90";
+  progress_percent: number;
+  deadline: string | null;
+}
+
+/** SLA警告一覧レスポンス */
+export interface SLAWarningsResponse {
+  warnings: SLAWarning[];
+  count: number;
+}
+
+/** SLA個別ステータスのSLA情報 */
+export interface SLADetail {
+  deadline: string;
+  met: boolean;
+  acknowledged_at?: string | null;
+  resolved_at?: string | null;
+  warning_level: string;
+  progress_percent: number;
+}
+
+/** SLA個別ステータスレスポンス */
+export interface SLAStatusResponse {
+  incident_id: string;
+  incident_number: string;
+  priority: string;
+  status: string;
+  sla_breached: boolean;
+  sla_breached_at: string | null;
+  response_sla?: SLADetail;
+  resolution_sla?: SLADetail;
+}
+
+/** SLA手動チェックレスポンス */
+export interface SLACheckResponse {
+  checked: boolean;
+  timestamp: string;
+  breaches_detected: number;
+  warnings_detected: number;
+}
