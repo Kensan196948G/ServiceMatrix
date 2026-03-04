@@ -27,8 +27,8 @@ def test_sr_number_format():
 def test_sr_valid_transitions_defined():
     """有効なステータス遷移が全ステータス分定義されていること"""
     expected_statuses = {
-        "New", "Pending_Approval", "Approved", "In_Progress",
-        "Fulfilled", "Rejected", "Cancelled"
+        "New", "Pending_Approval", "Approved", "In_Progress", "In_Fulfillment",
+        "Fulfilled", "Failed", "Rejected", "Cancelled", "Closed"
     }
     assert expected_statuses == set(VALID_SR_TRANSITIONS.keys())
     for transitions in VALID_SR_TRANSITIONS.values():

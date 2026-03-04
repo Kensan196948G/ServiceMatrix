@@ -130,3 +130,59 @@ async def transition_service_request_status(
         new_values={"status": target_status, "comment": comment},
     )
     return sr
+
+
+async def submit_request(db: AsyncSession, request_id: uuid.UUID, submitted_by: str) -> ServiceRequest:
+    """申請者がリクエストを提出（New→Pending_Approval）"""
+    sr = await transition_service_request_status(db, request_id, "Pending_Approval", None)
+    await audit_service.record_audit_log(
+        db,
+        action="SUBMIT",
+        resource_type="ServiceRequest",
+        resource_id=str(sr.request_id),
+        new_values={"submitted_by": submitted_by},
+    )
+    return sr
+
+
+async def approve_request(
+    db: AsyncSession, request_id: uuid.UUID, approved_by: str, comment: str = ""
+) -> ServiceRequest:
+    """承認（Pending_Approval→Approved）"""
+    sr = await transition_service_request_status(db, request_id, "Approved", comment)
+    await audit_service.record_audit_log(
+        db,
+        action="APPROVE",
+        resource_type="ServiceRequest",
+        resource_id=str(sr.request_id),
+        new_values={"approved_by": approved_by, "comment": comment},
+    )
+    return sr
+
+
+async def reject_request(
+    db: AsyncSession, request_id: uuid.UUID, rejected_by: str, comment: str = ""
+) -> ServiceRequest:
+    """却下（Pending_Approval→Rejected）"""
+    sr = await transition_service_request_status(db, request_id, "Rejected", comment)
+    await audit_service.record_audit_log(
+        db,
+        action="REJECT",
+        resource_type="ServiceRequest",
+        resource_id=str(sr.request_id),
+        new_values={"rejected_by": rejected_by, "comment": comment},
+    )
+    return sr
+
+
+async def start_fulfillment(db: AsyncSession, request_id: uuid.UUID) -> ServiceRequest:
+    """実行開始（Approved→In_Fulfillment）"""
+    return await transition_service_request_status(db, request_id, "In_Fulfillment", None)
+
+
+async def complete_request(
+    db: AsyncSession, request_id: uuid.UUID, success: bool = True
+) -> ServiceRequest:
+    """完了/失敗（In_Fulfillment→Fulfilled/Failed）"""
+    target = "Fulfilled" if success else "Failed"
+    return await transition_service_request_status(db, request_id, target, None)

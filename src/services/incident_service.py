@@ -8,6 +8,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.logging import get_logger
+from src.core.metrics import metrics
 from src.models.incident import Incident
 
 logger = get_logger(__name__)
@@ -67,6 +68,7 @@ async def create_incident(db: AsyncSession, data: dict[str, Any]) -> Incident:
     await db.flush()
     await db.refresh(incident)
     logger.info("incident_created", incident_number=incident_number, priority=incident.priority)
+    metrics.incidents_created_total += 1
 
     from src.services.notification_manager import manager  # noqa: PLC0415
     await manager.broadcast_incident_update(

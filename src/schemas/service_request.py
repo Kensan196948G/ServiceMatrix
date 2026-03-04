@@ -8,11 +8,14 @@ from pydantic import BaseModel, Field
 VALID_SR_TRANSITIONS: dict[str, set[str]] = {
     "New": {"Pending_Approval", "In_Progress"},
     "Pending_Approval": {"Approved", "Rejected"},
-    "Approved": {"In_Progress"},
+    "Approved": {"In_Progress", "In_Fulfillment"},
     "In_Progress": {"Fulfilled", "Cancelled"},
-    "Rejected": {"Cancelled"},
-    "Fulfilled": set(),
+    "In_Fulfillment": {"Fulfilled", "Failed"},
+    "Fulfilled": {"Closed"},
+    "Failed": {"Closed"},
+    "Rejected": {"Cancelled", "Closed"},
     "Cancelled": set(),
+    "Closed": set(),
 }
 
 
@@ -36,6 +39,15 @@ class ServiceRequestUpdate(BaseModel):
 class ServiceRequestStatusTransition(BaseModel):
     target_status: str
     comment: str | None = None
+
+
+class ServiceRequestApprovalAction(BaseModel):
+    actor: str = Field(..., description="承認/却下者のユーザーID or 名前")
+    comment: str = ""
+
+
+class ServiceRequestCompleteAction(BaseModel):
+    success: bool = True
 
 
 class ServiceRequestResponse(BaseModel):

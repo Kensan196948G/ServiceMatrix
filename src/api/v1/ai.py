@@ -8,8 +8,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.core.database import get_db
 from src.middleware.rbac import get_current_user
 from src.models.user import User
+from src.services.agent_orchestrator import orchestrator
 from src.services.ai_decision_log_service import AIDecision, ai_decision_log_service
 from src.services.ai_triage_service import ai_triage_service
+from src.services.auto_repair_service import auto_repair_service
 from src.services.change_impact_service import change_impact_service
 
 router = APIRouter(prefix="/ai", tags=["ai"])
@@ -169,4 +171,87 @@ async def get_change_impact(
         "confidence": latest.confidence,
         "provider": latest.provider,
         "timestamp": latest.timestamp.isoformat(),
+    }
+
+
+@router.post(
+    "/auto-repair/{incident_id}",
+    summary="自動修復候補分析実行",
+    status_code=status.HTTP_200_OK,
+)
+async def analyze_auto_repair(
+    incident_id: str,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+    title: str = Query(..., description="インシデントタイトル"),
+    description: str | None = Query(default=None, description="インシデント詳細"),
+) -> dict:
+    """指定インシデントの修復候補を分析して返す"""
+    analysis = await auto_repair_service.analyze(incident_id, title, description)
+    return {
+        "incident_id": analysis.incident_id,
+        "symptoms": analysis.symptoms,
+        "root_cause_hypothesis": analysis.root_cause_hypothesis,
+        "candidates": [
+            {
+                "action": c.action,
+                "description": c.description,
+                "risk_level": c.risk_level,
+                "confidence": c.confidence,
+                "automated": c.automated,
+                "steps": c.steps,
+            }
+            for c in analysis.candidates
+        ],
+        "recommended": {
+            "action": analysis.recommended.action,
+            "description": analysis.recommended.description,
+            "risk_level": analysis.recommended.risk_level,
+            "confidence": analysis.recommended.confidence,
+            "automated": analysis.recommended.automated,
+        }
+        if analysis.recommended
+        else None,
+        "analyzed_at": analysis.analyzed_at.isoformat(),
+    }
+
+
+@router.post(
+    "/auto-repair/{incident_id}/execute",
+    summary="低リスク修復自動実行（シミュレーション）",
+    status_code=status.HTTP_200_OK,
+)
+async def execute_auto_repair(
+    incident_id: str,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+    title: str = Query(..., description="インシデントタイトル"),
+    description: str | None = Query(default=None, description="インシデント詳細"),
+) -> dict:
+    """低リスク修復アクションをシミュレーション実行する"""
+    result = await auto_repair_service.execute_low_risk(incident_id, title, description)
+    return result
+
+
+@router.post(
+    "/orchestrate/{incident_id}",
+    summary="Agent Teamsオーケストレーション実行",
+    status_code=status.HTTP_200_OK,
+)
+async def orchestrate_incident(
+    incident_id: str,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+    title: str = Query(..., description="インシデントタイトル"),
+    description: str | None = Query(default=None, description="インシデント詳細"),
+) -> dict:
+    """インシデント複雑度を判定し、適切なAgent Teamsを動的構成して実行する"""
+    team_result = await orchestrator.orchestrate(db, incident_id, title, description)
+    return {
+        "task_id": team_result.task_id,
+        "complexity": team_result.complexity,
+        "agents_used": team_result.agents_used,
+        "results": team_result.results,
+        "total_confidence": team_result.total_confidence,
+        "executed_at": team_result.executed_at,
     }

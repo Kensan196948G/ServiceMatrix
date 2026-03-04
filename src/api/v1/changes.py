@@ -1,6 +1,7 @@
 """変更管理API - CRUD + リスク評価 + CAB承認"""
 
 import uuid
+from datetime import date
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -82,6 +83,61 @@ async def create_change(
     change_data["requested_by"] = current_user.user_id
     change = await change_service.create_change(db, change_data)
     return change
+
+
+@router.get(
+    "/calendar",
+    summary="変更カレンダー取得",
+    description="指定期間のスケジュール済み変更一覧を日付でグループ化して返します。",
+)
+async def get_change_calendar(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+    start_date: date = Query(..., description="開始日 YYYY-MM-DD"),
+    end_date: date = Query(..., description="終了日 YYYY-MM-DD"),
+):
+    """指定期間の変更カレンダー（スケジュール済み変更一覧）"""
+    from datetime import datetime, timezone
+
+    start_dt = datetime(start_date.year, start_date.month, start_date.day, tzinfo=timezone.utc)
+    end_dt = datetime(end_date.year, end_date.month, end_date.day, 23, 59, 59, tzinfo=timezone.utc)
+
+    query = (
+        select(Change)
+        .where(
+            Change.scheduled_start_at >= start_dt,
+            Change.scheduled_start_at <= end_dt,
+        )
+        .order_by(Change.scheduled_start_at)
+    )
+    result = await db.execute(query)
+    changes = result.scalars().all()
+
+    # 日付でグループ化
+    grouped: dict[str, list] = {}
+    for change in changes:
+        day = change.scheduled_start_at.date().isoformat()
+        if day not in grouped:
+            grouped[day] = []
+        grouped[day].append({
+            "change_id": str(change.change_id),
+            "change_number": change.change_number,
+            "title": change.title,
+            "status": change.status,
+            "change_type": change.change_type,
+            "risk_level": change.risk_level,
+            "scheduled_start_at": change.scheduled_start_at.isoformat(),
+            "scheduled_end_at": change.scheduled_end_at.isoformat() if change.scheduled_end_at else None,
+        })
+
+    events = [{"date": day, "changes": items} for day, items in sorted(grouped.items())]
+
+    return {
+        "start_date": start_date.isoformat(),
+        "end_date": end_date.isoformat(),
+        "total": len(changes),
+        "events": events,
+    }
 
 
 @router.get(

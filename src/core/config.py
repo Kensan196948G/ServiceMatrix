@@ -57,6 +57,12 @@ class Settings(BaseSettings):
     sla_warning_threshold_70: float = 0.70
     sla_warning_threshold_90: float = 0.90
 
+    # セキュリティ設定
+    rate_limit_per_minute: int = 200
+    rate_limit_enabled: bool = True
+    security_headers_enabled: bool = True
+    allowed_hosts: list[str] = ["localhost", "127.0.0.1", "servicematrix.local"]
+
 
 @lru_cache
 def get_settings() -> Settings:

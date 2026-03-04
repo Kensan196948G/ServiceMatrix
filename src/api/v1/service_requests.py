@@ -11,6 +11,8 @@ from src.middleware.rbac import get_current_user, require_role
 from src.models.user import User, UserRole
 from src.schemas.common import PaginatedResponse
 from src.schemas.service_request import (
+    ServiceRequestApprovalAction,
+    ServiceRequestCompleteAction,
     ServiceRequestCreate,
     ServiceRequestResponse,
     ServiceRequestStatusTransition,
@@ -132,6 +134,111 @@ async def transition_service_request_status(
         sr = await service_request_service.transition_service_request_status(
             db, request_id, transition.target_status, transition.comment
         )
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e)) from e
+    return sr
+
+
+@router.post("/{request_id}/submit", response_model=ServiceRequestResponse)
+async def submit_service_request(
+    request_id: uuid.UUID,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    """申請提出（New→Pending_Approval）"""
+    try:
+        sr = await service_request_service.submit_request(
+            db, request_id, str(current_user.user_id)
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e)) from e
+    return sr
+
+
+@router.post("/{request_id}/approve", response_model=ServiceRequestResponse)
+async def approve_service_request(
+    request_id: uuid.UUID,
+    action: ServiceRequestApprovalAction,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[
+        User,
+        Depends(require_role(UserRole.SYSTEM_ADMIN, UserRole.SERVICE_MANAGER)),
+    ],
+):
+    """承認（Pending_Approval→Approved）"""
+    try:
+        sr = await service_request_service.approve_request(
+            db, request_id, str(current_user.user_id), action.comment
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e)) from e
+    return sr
+
+
+@router.post("/{request_id}/reject", response_model=ServiceRequestResponse)
+async def reject_service_request(
+    request_id: uuid.UUID,
+    action: ServiceRequestApprovalAction,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[
+        User,
+        Depends(require_role(UserRole.SYSTEM_ADMIN, UserRole.SERVICE_MANAGER)),
+    ],
+):
+    """却下（Pending_Approval→Rejected）"""
+    try:
+        sr = await service_request_service.reject_request(
+            db, request_id, str(current_user.user_id), action.comment
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e)) from e
+    return sr
+
+
+@router.post("/{request_id}/start", response_model=ServiceRequestResponse)
+async def start_service_request_fulfillment(
+    request_id: uuid.UUID,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[
+        User,
+        Depends(
+            require_role(
+                UserRole.SYSTEM_ADMIN,
+                UserRole.SERVICE_MANAGER,
+                UserRole.INCIDENT_MANAGER,
+                UserRole.OPERATOR,
+            )
+        ),
+    ],
+):
+    """実行開始（Approved→In_Fulfillment）"""
+    try:
+        sr = await service_request_service.start_fulfillment(db, request_id)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e)) from e
+    return sr
+
+
+@router.post("/{request_id}/complete", response_model=ServiceRequestResponse)
+async def complete_service_request(
+    request_id: uuid.UUID,
+    action: ServiceRequestCompleteAction,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[
+        User,
+        Depends(
+            require_role(
+                UserRole.SYSTEM_ADMIN,
+                UserRole.SERVICE_MANAGER,
+                UserRole.INCIDENT_MANAGER,
+                UserRole.OPERATOR,
+            )
+        ),
+    ],
+):
+    """完了/失敗（In_Fulfillment→Fulfilled/Failed）"""
+    try:
+        sr = await service_request_service.complete_request(db, request_id, action.success)
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e)) from e
     return sr

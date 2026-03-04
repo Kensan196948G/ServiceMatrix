@@ -8,6 +8,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.logging import get_logger
+from src.core.metrics import metrics
 from src.models.change import Change
 
 logger = get_logger(__name__)
@@ -93,6 +94,7 @@ async def create_change(db: AsyncSession, data: dict[str, Any]) -> Change:
     await db.flush()
     await db.refresh(change)
     logger.info("change_created", change_number=change_number, risk_score=risk_score)
+    metrics.changes_created_total += 1
     return change
 
 

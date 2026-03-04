@@ -17,7 +17,8 @@ class ServiceRequest(Base, TimestampMixin):
     __table_args__ = (
         CheckConstraint(
             "status IN ("
-            "'New','Pending_Approval','Approved','In_Progress','Fulfilled','Rejected','Cancelled'"
+            "'New','Pending_Approval','Approved','In_Progress','In_Fulfillment',"
+            "'Fulfilled','Failed','Rejected','Cancelled','Closed'"
             ")",
             name="chk_sr_status",
         ),

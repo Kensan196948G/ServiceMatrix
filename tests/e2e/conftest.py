@@ -1,5 +1,4 @@
 """E2Eテスト用フィクスチャ"""
-import asyncio
 import uuid
 from datetime import datetime, timezone
 from unittest.mock import patch
@@ -17,15 +16,7 @@ from src.models.base import Base
 E2E_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
 
 
-@pytest.fixture(scope="module")
-def event_loop():
-    policy = asyncio.get_event_loop_policy()
-    loop = policy.new_event_loop()
-    yield loop
-    loop.close()
-
-
-@pytest_asyncio.fixture(scope="module")
+@pytest_asyncio.fixture(scope="session")
 async def e2e_engine():
     engine = create_async_engine(
         E2E_DATABASE_URL,

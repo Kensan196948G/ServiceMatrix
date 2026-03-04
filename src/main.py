@@ -9,6 +9,9 @@ from src.api.v1.router import api_router
 from src.core.config import settings
 from src.core.logging import setup_logging
 from src.middleware.audit import AuditMiddleware
+from src.middleware.metrics import MetricsMiddleware
+from src.middleware.rate_limit import RateLimitMiddleware
+from src.middleware.security_headers import SecurityHeadersMiddleware
 from src.services.sla_monitor_service import sla_monitor
 
 
@@ -51,6 +54,11 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
     app.add_middleware(AuditMiddleware)
+    app.add_middleware(MetricsMiddleware)
+    if settings.security_headers_enabled:
+        app.add_middleware(SecurityHeadersMiddleware)
+    if settings.rate_limit_enabled:
+        app.add_middleware(RateLimitMiddleware, calls=settings.rate_limit_per_minute, period=60)
 
     app.include_router(api_router, prefix="/api/v1")
 
