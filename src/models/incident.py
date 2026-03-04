@@ -3,11 +3,15 @@
 import enum
 import uuid
 from datetime import datetime
+from typing import TYPE_CHECKING
 
 from sqlalchemy import CheckConstraint, DateTime, ForeignKey, String, Text, Uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.models.base import Base, TimestampMixin
+
+if TYPE_CHECKING:
+    from src.models.user import Team, User
 
 
 class IncidentPriority(enum.StrEnum):

@@ -1,11 +1,15 @@
 """CMDB（構成管理データベース）モデル"""
 
 import uuid
+from typing import TYPE_CHECKING
 
 from sqlalchemy import JSON, CheckConstraint, ForeignKey, String, Text, Uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.models.base import Base, TimestampMixin
+
+if TYPE_CHECKING:
+    from src.models.user import User
 
 
 class ConfigurationItem(Base, TimestampMixin):
