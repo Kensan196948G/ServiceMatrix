@@ -6,8 +6,14 @@
 
 import { useEffect, useCallback, useRef, useState } from "react";
 
+export interface WsMessage {
+  type: string;
+  payload: Record<string, unknown>;
+  timestamp: string;
+}
+
 interface UseWebSocketOptions {
-  channel: "incidents" | "changes" | "sla_alerts" | "all";
+  channel?: "incidents" | "changes" | "sla_alerts" | "all" | "connect";
   onMessage?: (data: Record<string, unknown>) => void;
   autoReconnect?: boolean;
 }
@@ -15,20 +21,22 @@ interface UseWebSocketOptions {
 const WS_BASE_URL =
   process.env.NEXT_PUBLIC_WS_URL ||
   (typeof window !== "undefined"
-    ? `${window.location.protocol === "https:" ? "wss" : "ws"}://${window.location.hostname}:8000/api/v1`
-    : "ws://localhost:8000/api/v1");
+    ? `${window.location.protocol === "https:" ? "wss" : "ws"}://${window.location.hostname}:8001/api/v1`
+    : "ws://localhost:8001/api/v1");
 
 const RECONNECT_DELAY_MS = 3000;
 const MAX_RECONNECT_ATTEMPTS = 5;
 
-export function useWebSocket({
-  channel,
-  onMessage,
-  autoReconnect = true,
-}: UseWebSocketOptions) {
+export function useWebSocket(options: UseWebSocketOptions = {}) {
+  const { channel = "connect", onMessage, autoReconnect = true } = options;
+
   const [status, setStatus] = useState<
     "connecting" | "connected" | "disconnected"
   >("disconnected");
+  const [isConnected, setIsConnected] = useState(false);
+  const [messages, setMessages] = useState<WsMessage[]>([]);
+  const [lastMessage, setLastMessage] = useState<WsMessage | null>(null);
+
   const wsRef = useRef<WebSocket | null>(null);
   const attemptsRef = useRef(0);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -47,6 +55,7 @@ export function useWebSocket({
 
     ws.onopen = () => {
       setStatus("connected");
+      setIsConnected(true);
       attemptsRef.current = 0;
     };
 
@@ -58,6 +67,13 @@ export function useWebSocket({
           return;
         }
         onMessageRef.current?.(data);
+        const msg: WsMessage = {
+          type: (data.type as string) ?? "unknown",
+          payload: (data.payload as Record<string, unknown>) ?? data,
+          timestamp: (data.timestamp as string) ?? new Date().toISOString(),
+        };
+        setLastMessage(msg);
+        setMessages((prev) => [...prev.slice(-99), msg]);
       } catch {
         // non-JSON frames ignored
       }
@@ -65,6 +81,7 @@ export function useWebSocket({
 
     ws.onclose = () => {
       setStatus("disconnected");
+      setIsConnected(false);
       if (autoReconnect && attemptsRef.current < MAX_RECONNECT_ATTEMPTS) {
         attemptsRef.current += 1;
         timerRef.current = setTimeout(connect, RECONNECT_DELAY_MS);
@@ -76,6 +93,12 @@ export function useWebSocket({
     };
   }, [channel, autoReconnect]);
 
+  const disconnect = useCallback(() => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    attemptsRef.current = MAX_RECONNECT_ATTEMPTS; // prevent auto-reconnect
+    wsRef.current?.close();
+  }, []);
+
   useEffect(() => {
     connect();
     return () => {
@@ -84,5 +107,5 @@ export function useWebSocket({
     };
   }, [connect]);
 
-  return { status };
+  return { status, isConnected, messages, lastMessage, connect, disconnect };
 }

@@ -6,6 +6,7 @@
 
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useRouter } from "next/navigation";
 import { ChevronLeft, ChevronRight, X, Search, Plus } from "lucide-react";
 import apiClient from "@/lib/api";
 import Table from "@/components/ui/Table";
@@ -40,6 +41,7 @@ function getCiStatusVariant(status: string): "success" | "danger" | "warning" | 
 
 export default function CMDBPage() {
   const queryClient = useQueryClient();
+  const router = useRouter();
   const [skip, setSkip] = useState(0);
   const [search, setSearch] = useState("");
   const [filterType, setFilterType] = useState("");
@@ -209,7 +211,7 @@ export default function CMDBPage() {
           },
         ]}
         data={cis}
-        onRowClick={(row) => setSelectedCI(row)}
+        onRowClick={(row) => router.push(`/cmdb/${row.ci_id}`)}
         emptyMessage="CIはありません"
       />
 

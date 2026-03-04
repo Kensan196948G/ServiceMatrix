@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Bell, X, AlertTriangle, Clock, CheckCircle, GitPullRequest, Info } from "lucide-react";
+import { useWebSocket } from "@/hooks/useWebSocket";
 
 interface Notification {
   id: string;
@@ -89,6 +90,30 @@ export default function NotificationPanel() {
   const [open, setOpen] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>(SAMPLE_NOTIFICATIONS);
 
+  // WebSocket でリアルタイム通知を受信
+  const { isConnected } = useWebSocket({
+    channel: "all",
+    onMessage: (data) => {
+      const type = data.type as string;
+      let notifType: Notification["type"] = "info";
+      if (type?.includes("incident")) notifType = "incident";
+      else if (type?.includes("sla")) notifType = "sla";
+      else if (type?.includes("change")) notifType = "change";
+
+      const payload = (data.payload ?? data) as Record<string, unknown>;
+      const newNotif: Notification = {
+        id: `ws-${Date.now()}`,
+        type: notifType,
+        title: (payload.title as string) ?? type ?? "新しい通知",
+        body: (payload.description as string) ?? (payload.message as string) ?? JSON.stringify(payload).slice(0, 80),
+        time: "今",
+        read: false,
+      };
+      setNotifications((prev) => [newNotif, ...prev]);
+    },
+    autoReconnect: true,
+  });
+
   const unreadCount = notifications.filter((n) => !n.read).length;
 
   const markAllRead = () => {
@@ -110,8 +135,11 @@ export default function NotificationPanel() {
       <button
         onClick={() => setOpen(!open)}
         className="relative rounded-md p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-700"
+        title={isConnected ? "リアルタイム接続中" : "オフライン"}
       >
         <Bell style={{ width: "18px", height: "18px" }} />
+        {/* 接続状態インジケーター */}
+        <span className={`absolute right-0.5 bottom-0.5 w-2 h-2 rounded-full border border-white ${isConnected ? "bg-green-400" : "bg-gray-300"}`} />
         {unreadCount > 0 && (
           <span className="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white ring-2 ring-white">
             {unreadCount > 9 ? "9+" : unreadCount}

@@ -159,9 +159,11 @@ export interface CI {
   ci_id: string;
   name: string;
   ci_type: string;
+  ci_class?: string;
   status: string;
   description?: string;
   team_id?: string;
+  version?: string;
   depends_on?: string[];
   incident_count?: number;
   created_at: string;

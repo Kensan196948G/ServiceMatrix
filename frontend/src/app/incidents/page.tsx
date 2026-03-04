@@ -5,6 +5,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Plus, Filter, RefreshCw, AlertTriangle, Clock, CheckCircle2, XCircle } from "lucide-react";
 import apiClient from "@/lib/api";
@@ -182,20 +183,21 @@ export default function IncidentsPage() {
         ) : (
           <>
             {/* テーブルヘッダー */}
-            <div className="grid grid-cols-[140px_1fr_90px_130px_90px_110px] gap-3 border-b border-gray-100 bg-gray-50 px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-gray-500">
+            <div className="grid grid-cols-[140px_1fr_90px_130px_90px_110px_80px] gap-3 border-b border-gray-100 bg-gray-50 px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-gray-500">
               <span>番号</span>
               <span>タイトル</span>
               <span>優先度</span>
               <span>ステータス</span>
               <span>SLA</span>
               <span>作成日時</span>
+              <span></span>
             </div>
 
             {/* テーブル行 */}
             {incidents.map((incident) => (
               <div
                 key={incident.incident_id}
-                className="grid grid-cols-[140px_1fr_90px_130px_90px_110px] gap-3 items-center border-b border-gray-50 px-4 py-3 hover:bg-blue-50/40 transition-colors cursor-pointer last:border-0"
+                className="grid grid-cols-[140px_1fr_90px_130px_90px_110px_80px] gap-3 items-center border-b border-gray-50 px-4 py-3 hover:bg-blue-50/40 transition-colors last:border-0"
               >
                 <span className="font-mono text-xs text-gray-500">{incident.incident_number}</span>
                 <div className="min-w-0">
@@ -227,6 +229,14 @@ export default function IncidentsPage() {
                 </span>
                 <span className="text-xs text-gray-400">
                   {new Date(incident.created_at).toLocaleDateString("ja-JP", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+                </span>
+                <span>
+                  <Link
+                    href={`/incidents/${incident.incident_id}`}
+                    className="text-xs text-blue-600 hover:text-blue-800 hover:underline font-medium"
+                  >
+                    詳細を見る
+                  </Link>
                 </span>
               </div>
             ))}

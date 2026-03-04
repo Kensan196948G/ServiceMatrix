@@ -5,6 +5,7 @@
 
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import Link from "next/link";
 import { Plus, Filter, RefreshCw, GitPullRequest, Shield, AlertTriangle, CheckCircle2, XCircle } from "lucide-react";
 import apiClient from "@/lib/api";
 import Badge, { getStatusVariant } from "@/components/ui/Badge";
@@ -123,7 +124,7 @@ export default function ChangesPage() {
               <span>番号</span><span>タイトル</span><span>タイプ</span><span>ステータス</span><span>リスク</span><span>予定日</span>
             </div>
             {changes.map((c) => (
-              <div key={c.change_id} className="grid grid-cols-[140px_1fr_110px_130px_90px_110px] gap-3 items-center border-b border-gray-50 px-4 py-3 hover:bg-blue-50/40 transition-colors cursor-pointer last:border-0">
+              <Link key={c.change_id} href={`/changes/${c.change_id}`} className="grid grid-cols-[140px_1fr_110px_130px_90px_110px] gap-3 items-center border-b border-gray-50 px-4 py-3 hover:bg-blue-50/40 transition-colors cursor-pointer last:border-0">
                 <span className="font-mono text-xs text-gray-500">{c.change_number}</span>
                 <div className="min-w-0">
                   <p className="truncate text-sm font-medium text-gray-800">{c.title}</p>
@@ -141,7 +142,7 @@ export default function ChangesPage() {
                 <span className="text-xs text-gray-400">
                   {c.scheduled_start_at ? new Date(c.scheduled_start_at).toLocaleDateString("ja-JP", { month: "short", day: "numeric" }) : "-"}
                 </span>
-              </div>
+              </Link>
             ))}
           </>
         )}

@@ -12,6 +12,7 @@ import NotificationPanel from "@/components/layout/NotificationPanel";
 
 const pageTitles: Record<string, string> = {
   "/": "ダッシュボード",
+  "/incidents/[id]": "インシデント詳細",
   "/incidents": "インシデント管理",
   "/changes": "変更管理",
   "/problems": "問題管理",
@@ -31,6 +32,19 @@ const pageTitles: Record<string, string> = {
   "/profile/settings": "個人設定",
 };
 
+// 動的ルートのタイトル解決
+function resolveTitle(pathname: string): string {
+  if (pageTitles[pathname]) return pageTitles[pathname];
+  if (/^\/incidents\/[^/]+$/.test(pathname)) return "インシデント詳細";
+  if (/^\/changes\/[^/]+$/.test(pathname)) return "変更詳細";
+  if (/^\/problems\/[^/]+$/.test(pathname)) return "問題詳細";
+  if (/^\/cmdb\/[^/]+$/.test(pathname)) return "CI詳細・依存関係グラフ";
+  const match = Object.entries(pageTitles).find(([path]) =>
+    path !== "/" && pathname.startsWith(path)
+  );
+  return match?.[1] ?? "ServiceMatrix";
+}
+
 export default function Header() {
   const pathname = usePathname();
   const router = useRouter();
@@ -38,9 +52,7 @@ export default function Header() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [searchFocused, setSearchFocused] = useState(false);
 
-  const title = Object.entries(pageTitles).find(([path]) =>
-    path === pathname || (path !== "/" && pathname.startsWith(path))
-  )?.[1] ?? "ServiceMatrix";
+  const title = resolveTitle(pathname);
 
   const roleLabel: Record<string, string> = {
     SystemAdmin: "システム管理者",
