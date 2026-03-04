@@ -3,7 +3,8 @@
  */
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect } from "react";
 import Link from "next/link";
 import {
   AlertTriangle, GitPullRequest, HelpCircle, ClipboardList,
@@ -38,6 +39,37 @@ const STATUS_COLORS = ["#3b82f6", "#f97316", "#22c55e", "#a855f7", "#6b7280"];
 
 export default function DashboardPage() {
   const { user } = useAuthStore();
+  const queryClient = useQueryClient();
+
+  // WebSocketでリアルタイム更新
+  useEffect(() => {
+    const wsUrl = `ws://${window.location.hostname}:8001/ws/notifications`;
+    let ws: WebSocket | null = null;
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const connect = () => {
+      ws = new WebSocket(wsUrl);
+      ws.onmessage = (evt) => {
+        try {
+          const msg = JSON.parse(evt.data);
+          if (msg.type === "incident_update" || msg.type === "incident_created") {
+            queryClient.invalidateQueries({ queryKey: ["dashboard-incidents"] });
+          } else if (msg.type === "change_update") {
+            queryClient.invalidateQueries({ queryKey: ["dashboard-changes"] });
+          }
+        } catch { /* ignore parse errors */ }
+      };
+      ws.onclose = () => {
+        retryTimer = setTimeout(connect, 10000);
+      };
+    };
+
+    connect();
+    return () => {
+      ws?.close();
+      if (retryTimer) clearTimeout(retryTimer);
+    };
+  }, [queryClient]);
 
   const { data: incidents, isLoading: incLoading } = useQuery({
     queryKey: ["dashboard-incidents"],
@@ -45,25 +77,26 @@ export default function DashboardPage() {
       params: { page: 1, size: 10 }
     }).then(r => r.data),
     retry: 1,
-    staleTime: 30000,
+    staleTime: 15000,
+    refetchInterval: 30000,
   });
 
   const { data: changes } = useQuery({
     queryKey: ["dashboard-changes"],
     queryFn: () => apiClient.get("/changes", { params: { page: 1, size: 100 } }).then(r => r.data),
-    retry: 1, staleTime: 30000,
+    retry: 1, staleTime: 15000, refetchInterval: 30000,
   });
 
   const { data: problems } = useQuery({
     queryKey: ["dashboard-problems"],
     queryFn: () => apiClient.get("/problems", { params: { page: 1, size: 100 } }).then(r => r.data),
-    retry: 1, staleTime: 30000,
+    retry: 1, staleTime: 15000, refetchInterval: 30000,
   });
 
   const { data: serviceRequests } = useQuery({
     queryKey: ["dashboard-sr"],
     queryFn: () => apiClient.get("/service-requests", { params: { page: 1, size: 100 } }).then(r => r.data),
-    retry: 1, staleTime: 30000,
+    retry: 1, staleTime: 15000, refetchInterval: 30000,
   });
 
   const incidentItems: IncidentResponse[] = (incidents as { items?: IncidentResponse[] })?.items ?? (incidents as unknown as IncidentResponse[]) ?? [];

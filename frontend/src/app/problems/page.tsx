@@ -4,6 +4,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Plus, Filter, RefreshCw, HelpCircle, CheckCircle2, XCircle } from "lucide-react";
 import apiClient from "@/lib/api";
@@ -105,7 +106,7 @@ export default function ProblemsPage() {
               <span>番号</span><span>タイトル</span><span>ステータス</span><span>既知エラー</span><span>作成日時</span>
             </div>
             {problems.map((p) => (
-              <div key={p.problem_id} className="grid grid-cols-[140px_1fr_130px_90px_120px] gap-3 items-center border-b border-gray-50 px-4 py-3 hover:bg-blue-50/40 transition-colors cursor-pointer last:border-0">
+              <Link key={p.problem_id} href={`/problems/${p.problem_id}`} className="grid grid-cols-[140px_1fr_130px_90px_120px] gap-3 items-center border-b border-gray-50 px-4 py-3 hover:bg-blue-50/40 transition-colors cursor-pointer last:border-0">
                 <span className="font-mono text-xs text-gray-500">{p.problem_number}</span>
                 <div className="min-w-0">
                   <p className="truncate text-sm font-medium text-gray-800">{p.title}</p>
@@ -114,7 +115,7 @@ export default function ProblemsPage() {
                 <span><Badge variant={getStatusVariant(p.status)}>{p.status.replace(/_/g, " ")}</Badge></span>
                 <span>{p.known_error ? <Badge variant="warning">既知</Badge> : <span className="text-xs text-gray-400">-</span>}</span>
                 <span className="text-xs text-gray-400">{new Date(p.created_at).toLocaleDateString("ja-JP", { month: "short", day: "numeric" })}</span>
-              </div>
+              </Link>
             ))}
           </>
         )}

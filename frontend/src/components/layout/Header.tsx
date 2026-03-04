@@ -38,6 +38,7 @@ function resolveTitle(pathname: string): string {
   if (/^\/incidents\/[^/]+$/.test(pathname)) return "インシデント詳細";
   if (/^\/changes\/[^/]+$/.test(pathname)) return "変更詳細";
   if (/^\/problems\/[^/]+$/.test(pathname)) return "問題詳細";
+  if (/^\/service-requests\/[^/]+$/.test(pathname)) return "サービスリクエスト詳細";
   if (/^\/cmdb\/[^/]+$/.test(pathname)) return "CI詳細・依存関係グラフ";
   const match = Object.entries(pageTitles).find(([path]) =>
     path !== "/" && pathname.startsWith(path)

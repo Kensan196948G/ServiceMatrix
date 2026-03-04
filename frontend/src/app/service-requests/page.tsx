@@ -4,6 +4,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Plus, Filter, RefreshCw, ClipboardList, CheckCircle2, XCircle } from "lucide-react";
 import apiClient from "@/lib/api";
@@ -103,13 +104,13 @@ export default function ServiceRequestsPage() {
               <span>番号</span><span>タイトル</span><span>優先度</span><span>ステータス</span><span>作成日時</span>
             </div>
             {requests.map((req) => (
-              <div key={req.request_id} className="grid grid-cols-[140px_1fr_90px_150px_120px] gap-3 items-center border-b border-gray-50 px-4 py-3 hover:bg-blue-50/40 transition-colors cursor-pointer last:border-0">
+              <Link key={req.request_id} href={`/service-requests/${req.request_id}`} className="grid grid-cols-[140px_1fr_90px_150px_120px] gap-3 items-center border-b border-gray-50 px-4 py-3 hover:bg-blue-50/40 transition-colors cursor-pointer last:border-0">
                 <span className="font-mono text-xs text-gray-500">{req.request_number}</span>
                 <p className="truncate text-sm font-medium text-gray-800">{req.title}</p>
                 <span className="text-xs text-gray-500">{req.priority ?? "P3"}</span>
                 <span><Badge variant={getStatusVariant(req.status)}>{req.status.replace(/_/g, " ")}</Badge></span>
                 <span className="text-xs text-gray-400">{new Date(req.created_at).toLocaleDateString("ja-JP", { month: "short", day: "numeric" })}</span>
-              </div>
+              </Link>
             ))}
           </>
         )}
