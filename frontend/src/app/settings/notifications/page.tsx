@@ -15,6 +15,8 @@ interface NotificationSettings {
   incident_created: boolean;
   change_approved: boolean;
   sr_completed: boolean;
+  webhook_url: string;
+  webhook_type: string;
 }
 
 interface ToggleRowProps {
@@ -49,11 +51,15 @@ export default function NotificationsPage() {
     incident_created: true,
     change_approved: false,
     sr_completed: false,
+    webhook_url: "",
+    webhook_type: "slack",
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [webhookTesting, setWebhookTesting] = useState(false);
+  const [webhookTestResult, setWebhookTestResult] = useState<{ success: boolean; message: string } | null>(null);
 
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -72,9 +78,26 @@ export default function NotificationsPage() {
       .finally(() => setLoading(false));
   }, [isAuthenticated]);
 
-  const update = (key: keyof NotificationSettings, value: boolean) => {
+  const update = (key: keyof NotificationSettings, value: boolean | string) => {
     setSettings((prev) => ({ ...prev, [key]: value }));
     setSaved(false);
+  };
+
+  const handleTestWebhook = async () => {
+    if (!settings.webhook_url) return;
+    setWebhookTesting(true);
+    setWebhookTestResult(null);
+    try {
+      const res = await apiClient.post<{ success: boolean; message: string }>(
+        "/notifications/settings/test-webhook",
+        { webhook_url: settings.webhook_url, webhook_type: settings.webhook_type }
+      );
+      setWebhookTestResult(res.data);
+    } catch {
+      setWebhookTestResult({ success: false, message: "リクエスト失敗" });
+    } finally {
+      setWebhookTesting(false);
+    }
   };
 
   const handleSave = async () => {
@@ -196,6 +219,62 @@ export default function NotificationsPage() {
               checked={settings.sr_completed}
               onChange={(v) => update("sr_completed", v)}
             />
+          </div>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Webhook className="h-4 w-4 text-purple-500" />
+              Slack / Teams Webhook
+            </CardTitle>
+          </CardHeader>
+          <div className="space-y-3">
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Webhook URL</label>
+              <input
+                type="url"
+                value={settings.webhook_url}
+                onChange={(e) => update("webhook_url", e.target.value)}
+                placeholder="https://hooks.slack.com/services/..."
+                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Webhookタイプ</label>
+              <div className="flex gap-4">
+                {(["slack", "teams"] as const).map((type) => (
+                  <label key={type} className="flex items-center gap-1.5 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="webhook_type"
+                      value={type}
+                      checked={settings.webhook_type === type}
+                      onChange={() => update("webhook_type", type)}
+                      className="accent-blue-600"
+                    />
+                    <span className="text-sm text-gray-700">
+                      {type === "slack" ? "Slack" : "Microsoft Teams"}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={handleTestWebhook}
+                disabled={webhookTesting || !settings.webhook_url}
+                className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 text-gray-700 text-sm rounded-lg hover:bg-gray-200 disabled:opacity-50 transition"
+              >
+                {webhookTesting && <RefreshCw size={12} className="animate-spin" />}
+                接続テスト
+              </button>
+              {webhookTestResult && (
+                <span className={`text-sm ${webhookTestResult.success ? "text-green-600" : "text-red-600"}`}>
+                  {webhookTestResult.success ? "✅" : "❌"} {webhookTestResult.message}
+                </span>
+              )}
+            </div>
           </div>
         </Card>
 

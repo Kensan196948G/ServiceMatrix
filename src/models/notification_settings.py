@@ -33,7 +33,11 @@ class NotificationSettings(Base):
     settings_json: Mapped[str] = mapped_column(
         Text,
         nullable=False,
-        default='{"email":true,"sla_breach":true,"incident_created":true,"change_approved":false,"sr_completed":false}',
+        default=(
+            '{"email":true,"sla_breach":true,"incident_created":true,'
+            '"change_approved":false,"sr_completed":false,'
+            '"webhook_url":"","webhook_type":"slack"}'
+        ),
     )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

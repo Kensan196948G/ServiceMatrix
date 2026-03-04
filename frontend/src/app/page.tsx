@@ -428,6 +428,37 @@ export default function DashboardPage() {
           <p className="text-xs text-gray-400 mt-1">対応中 {stats.srOpen}件</p>
         </div>
       </div>
+
+      {/* SLA達成率チャート（優先度別） */}
+      <div className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
+        <h3 className="mb-4 text-sm font-semibold text-gray-700 flex items-center gap-2">
+          <ShieldAlert className="h-4 w-4 text-orange-500" />
+          優先度別SLA達成率
+        </h3>
+        <ResponsiveContainer width="100%" height={200}>
+          <BarChart data={[
+            { priority: "P1", 達成率: 72 },
+            { priority: "P2", 達成率: 85 },
+            { priority: "P3", 達成率: 91 },
+            { priority: "P4", 達成率: 97 },
+          ]}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+            <XAxis dataKey="priority" tick={{ fontSize: 12 }} tickLine={false} axisLine={false} />
+            <YAxis domain={[0, 100]} tick={{ fontSize: 11 }} tickLine={false} axisLine={false} unit="%" />
+            <Tooltip contentStyle={{ fontSize: 12, borderRadius: "8px", border: "1px solid #e5e7eb" }} formatter={(v: number | string | undefined) => [`${v ?? 0}%`, "SLA達成率"] as [string, string]} />
+            <Bar dataKey="達成率" radius={[4, 4, 0, 0]}>
+              {[
+                { priority: "P1", fill: "#ef4444" },
+                { priority: "P2", fill: "#f97316" },
+                { priority: "P3", fill: "#eab308" },
+                { priority: "P4", fill: "#22c55e" },
+              ].map(entry => (
+                <Cell key={entry.priority} fill={entry.fill} />
+              ))}
+            </Bar>
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
     </div>
   );
 }

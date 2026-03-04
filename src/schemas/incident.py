@@ -49,6 +49,18 @@ class IncidentBulkAssign(BaseModel):
     assigned_team_id: uuid.UUID | None = None
 
 
+class BulkIncidentUpdate(BaseModel):
+    incident_ids: list[uuid.UUID]
+    action: str  # "close" | "assign" | "set_priority"
+    assignee_id: uuid.UUID | None = None
+    priority: str | None = None
+
+
+class BulkIncidentResponse(BaseModel):
+    updated_count: int
+    failed_ids: list[uuid.UUID]
+
+
 class IncidentStatusTransition(BaseModel):
     new_status: str
     notes: str | None = None

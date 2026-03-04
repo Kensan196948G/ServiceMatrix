@@ -276,6 +276,77 @@ jobs:
           path: bandit-report.json
 
   # ─────────────────────────────────────────────────
+  # Job: E2E Tests (Playwright)
+  # ─────────────────────────────────────────────────
+  e2e-test:
+    name: E2E Tests (Playwright)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install backend dependencies
+        run: |
+          pip install fastapi "uvicorn[standard]" "sqlalchemy[asyncio]" alembic \
+            pydantic "pydantic-settings" \
+            "python-jose[cryptography]" "passlib[bcrypt]" "bcrypt>=3.2,<4.0" \
+            httpx redis structlog apscheduler aiosqlite python-multipart
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        run: cd frontend && npm ci
+
+      - name: Install Playwright browsers
+        run: cd frontend && npx playwright install chromium --with-deps
+
+      - name: Build frontend
+        run: cd frontend && npm run build
+        env:
+          NEXT_PUBLIC_API_URL: http://localhost:8000/api/v1
+
+      - name: Start backend server
+        run: |
+          uvicorn src.main:app --host 0.0.0.0 --port 8000 &
+          sleep 5
+          curl -f http://localhost:8000/api/v1/health || exit 1
+        env:
+          ENVIRONMENT: test
+
+      - name: Start frontend server
+        run: |
+          cd frontend && npm run start -- --port 3000 &
+          sleep 8
+          curl -f http://localhost:3000 || true
+
+      - name: Run Playwright E2E tests
+        run: cd frontend && npx playwright test --reporter=list
+        env:
+          E2E_BASE_URL: http://localhost:3000
+          E2E_ADMIN_USER: admin
+          E2E_ADMIN_PASS: admin1234
+        continue-on-error: true
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: frontend/playwright-report/
+          retention-days: 7
+
+  # ─────────────────────────────────────────────────
   # Job 5: Summary Report
   # ─────────────────────────────────────────────────
   ci-summary:
@@ -292,6 +363,7 @@ jobs:
       - lint
       - type-check
       - security
+      - e2e-test
     if: always()
     steps:
       - name: Checkout
@@ -313,5 +385,6 @@ jobs:
           echo "| Ruff Lint | ${{ needs.lint.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Type Check (mypy) | ${{ needs.type-check.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Security Scan (bandit) | ${{ needs.security.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| E2E Tests (Playwright) | ${{ needs.e2e-test.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "🕐 実行時刻: $(date '+%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY

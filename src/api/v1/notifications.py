@@ -23,6 +23,8 @@ class NotificationSettingsSchema(BaseModel):
     incident_created: bool = True
     change_approved: bool = False
     sr_completed: bool = False
+    webhook_url: str = ""
+    webhook_type: str = "slack"  # "slack" | "teams"
 
     model_config = {"json_schema_extra": {"example": {"email": True, "sla_breach": True}}}
 
@@ -103,3 +105,33 @@ async def reset_notification_settings(
     record = result.scalar_one_or_none()
     if record:
         await db.delete(record)
+
+
+class WebhookTestRequest(BaseModel):
+    webhook_url: str
+    webhook_type: str = "slack"
+
+
+class WebhookTestResponse(BaseModel):
+    success: bool
+    message: str
+
+
+@router.post("/settings/test-webhook", response_model=WebhookTestResponse)
+async def test_webhook(
+    body: WebhookTestRequest,
+    current_user: User = Depends(get_current_user),
+) -> WebhookTestResponse:
+    """Webhook URL接続テスト"""
+    from src.services.notification_webhook_service import send_webhook_notification
+
+    success = await send_webhook_notification(
+        body.webhook_url,
+        body.webhook_type,  # type: ignore[arg-type]
+        "ServiceMatrix接続テスト成功 ✅",
+        "ServiceMatrix テスト通知",
+    )
+    return WebhookTestResponse(
+        success=success,
+        message="送信成功" if success else "送信失敗（URL・権限を確認してください）",
+    )

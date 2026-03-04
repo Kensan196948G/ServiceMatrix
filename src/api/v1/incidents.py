@@ -13,6 +13,8 @@ from src.models.incident import Incident
 from src.models.user import User, UserRole
 from src.schemas.common import PaginatedResponse
 from src.schemas.incident import (
+    BulkIncidentResponse,
+    BulkIncidentUpdate,
     IncidentBulkAssign,
     IncidentCreate,
     IncidentResponse,
@@ -228,6 +230,53 @@ async def run_ai_triage(
         "reasoning": triage_result.reasoning,
         "ai_triage_notes": incident.ai_triage_notes,
     }
+
+
+@router.post(
+    "/bulk-update",
+    response_model=BulkIncidentResponse,
+    summary="インシデント一括操作",
+    description="複数インシデントをまとめてクローズ・担当者変更・優先度変更します。",
+    tags=["incidents"],
+)
+async def bulk_update_incidents(
+    body: BulkIncidentUpdate,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[
+        User,
+        Depends(
+            require_role(
+                UserRole.SYSTEM_ADMIN,
+                UserRole.SERVICE_MANAGER,
+                UserRole.INCIDENT_MANAGER,
+            )
+        ),
+    ],
+) -> BulkIncidentResponse:
+    """インシデント一括操作（クローズ・担当者変更・優先度変更）"""
+    updated = 0
+    failed: list[uuid.UUID] = []
+    for iid in body.incident_ids:
+        try:
+            result = await db.execute(select(Incident).where(Incident.incident_id == iid))
+            incident = result.scalar_one_or_none()
+            if not incident:
+                failed.append(iid)
+                continue
+            if body.action == "close":
+                incident.status = "Closed"
+            elif body.action == "assign" and body.assignee_id is not None:
+                incident.assigned_to = body.assignee_id
+            elif body.action == "set_priority" and body.priority is not None:
+                incident.priority = body.priority
+            else:
+                failed.append(iid)
+                continue
+            await db.flush()
+            updated += 1
+        except Exception:
+            failed.append(iid)
+    return BulkIncidentResponse(updated_count=updated, failed_ids=failed)
 
 
 @router.patch(

@@ -63,6 +63,7 @@ export default function IncidentsPage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkStatus, setBulkStatus] = useState("");
   const [bulkAssignee, setBulkAssignee] = useState("");
+  const [bulkPriority, setBulkPriority] = useState("");
 
   const queryKey = ["incidents", page, filterStatus, filterPriority];
   const { data, isLoading, error, refetch } = useQuery({
@@ -115,6 +116,20 @@ export default function IncidentsPage() {
       return next;
     });
   };
+
+  const bulkUpdateMutation = useMutation({
+    mutationFn: (payload: { action: string; assignee_id?: string; priority?: string }) =>
+      apiClient.post("/incidents/bulk-update", {
+        incident_ids: Array.from(selectedIds),
+        ...payload,
+      }).then(r => r.data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["incidents"] });
+      setSelectedIds(new Set());
+      setBulkAssignee("");
+      setBulkPriority("");
+    },
+  });
 
   const bulkTransitionMutation = useMutation({
     mutationFn: async (newStatus: string) => {
@@ -240,26 +255,15 @@ export default function IncidentsPage() {
             {selectedIds.size > 0 && (
               <div className="flex flex-wrap items-center gap-3 bg-blue-50 border-b border-blue-200 px-4 py-2.5">
                 <span className="text-sm font-medium text-blue-700">{selectedIds.size}件選択中</span>
-                {/* 一括ステータス変更 */}
-                <select
-                  value={bulkStatus}
-                  onChange={e => setBulkStatus(e.target.value)}
-                  className="rounded border border-blue-300 px-2 py-1 text-xs text-blue-800 bg-white"
-                >
-                  <option value="">ステータスを変更...</option>
-                  <option value="Acknowledged">Acknowledged</option>
-                  <option value="In_Progress">In Progress</option>
-                  <option value="Resolved">Resolved</option>
-                  <option value="Closed">Closed</option>
-                </select>
+                {/* 一括クローズ */}
                 <button
-                  disabled={!bulkStatus || bulkTransitionMutation.isPending}
-                  onClick={() => bulkTransitionMutation.mutate(bulkStatus)}
-                  className="px-3 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 disabled:opacity-50"
+                  disabled={bulkUpdateMutation.isPending}
+                  onClick={() => bulkUpdateMutation.mutate({ action: "close" })}
+                  className="px-3 py-1 bg-red-600 text-white text-xs rounded hover:bg-red-700 disabled:opacity-50"
                 >
-                  {bulkTransitionMutation.isPending ? "処理中..." : "一括変更"}
+                  {bulkUpdateMutation.isPending ? "処理中..." : "一括クローズ"}
                 </button>
-                {/* 一括担当者割り当て */}
+                {/* 担当者変更 */}
                 <span className="text-blue-300">|</span>
                 <select
                   value={bulkAssignee}
@@ -274,11 +278,31 @@ export default function IncidentsPage() {
                   ))}
                 </select>
                 <button
-                  disabled={!bulkAssignee || bulkAssignMutation.isPending}
-                  onClick={() => bulkAssignMutation.mutate(bulkAssignee)}
+                  disabled={!bulkAssignee || bulkUpdateMutation.isPending}
+                  onClick={() => bulkUpdateMutation.mutate({ action: "assign", assignee_id: bulkAssignee })}
                   className="px-3 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700 disabled:opacity-50"
                 >
-                  {bulkAssignMutation.isPending ? "処理中..." : "一括割り当て"}
+                  担当者変更
+                </button>
+                {/* 優先度変更 */}
+                <span className="text-blue-300">|</span>
+                <select
+                  value={bulkPriority}
+                  onChange={e => setBulkPriority(e.target.value)}
+                  className="rounded border border-blue-300 px-2 py-1 text-xs bg-white"
+                >
+                  <option value="">優先度を選択...</option>
+                  <option value="P1">P1 - 緊急</option>
+                  <option value="P2">P2 - 高</option>
+                  <option value="P3">P3 - 中</option>
+                  <option value="P4">P4 - 低</option>
+                </select>
+                <button
+                  disabled={!bulkPriority || bulkUpdateMutation.isPending}
+                  onClick={() => bulkUpdateMutation.mutate({ action: "set_priority", priority: bulkPriority })}
+                  className="px-3 py-1 bg-orange-600 text-white text-xs rounded hover:bg-orange-700 disabled:opacity-50"
+                >
+                  優先度変更
                 </button>
                 <button
                   onClick={() => setSelectedIds(new Set())}

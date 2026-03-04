@@ -8,8 +8,9 @@ export default defineConfig({
   testDir: "./tests/e2e",
   fullyParallel: false,
   forbidOnly: !!process.env.CI,
-  retries: process.env.CI ? 2 : 0,
+  retries: process.env.CI ? 1 : 0,
   workers: 1,
+  timeout: 30000,
   reporter: [["html", { outputFolder: "playwright-report" }], ["list"]],
 
   use: {
