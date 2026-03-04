@@ -1,10 +1,13 @@
 """Strawberry GraphQL スキーマ定義"""
 
+import os
 import uuid
 
 import strawberry
+from fastapi import Request
 from strawberry.fastapi import GraphQLRouter
 
+from src.core.security import decode_token
 from src.graphql.types import (
     ChangeRequestType,
     IncidentType,
@@ -13,9 +16,20 @@ from src.graphql.types import (
 )
 
 
-def get_context():
-    """GraphQL コンテキスト（DB セッションは各リゾルバーで取得）"""
-    return {}
+async def get_context(request: Request):
+    """GraphQL コンテキスト（認証情報付き）"""
+    user_id = None
+    user_role = None
+    auth = request.headers.get("Authorization", "")
+    if auth.startswith("Bearer "):
+        try:
+            token = auth[7:]
+            payload = decode_token(token)
+            user_id = payload.get("sub")
+            user_role = payload.get("role")
+        except ValueError:
+            pass
+    return {"user_id": user_id, "user_role": user_role}
 
 
 @strawberry.type
@@ -106,6 +120,9 @@ class Query:
             ]
 
 
+VALID_INCIDENT_STATUSES = {"Open", "In_Progress", "Resolved", "Closed", "Pending"}
+
+
 @strawberry.type
 class Mutation:
     @strawberry.mutation(description="インシデントステータス更新")
@@ -114,6 +131,13 @@ class Mutation:
         id: uuid.UUID,
         status: str,
     ) -> NotificationType:
+        if status not in VALID_INCIDENT_STATUSES:
+            valid = ", ".join(sorted(VALID_INCIDENT_STATUSES))
+            return NotificationType(
+                success=False,
+                message=f"無効なステータスです。有効値: {valid}",
+            )
+
         from sqlalchemy import select
 
         from src.core.database import AsyncSessionLocal
@@ -130,4 +154,5 @@ class Mutation:
 
 
 schema = strawberry.Schema(query=Query, mutation=Mutation)
-graphql_router = GraphQLRouter(schema, graphql_ide="graphiql")
+_ide = "graphiql" if os.getenv("ENVIRONMENT", "development") != "production" else None
+graphql_router = GraphQLRouter(schema, graphql_ide=_ide, context_getter=get_context)
