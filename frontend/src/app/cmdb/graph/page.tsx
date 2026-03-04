@@ -19,13 +19,14 @@ import "@xyflow/react/dist/style.css";
 import apiClient from "@/lib/api";
 import { useAuthStore } from "@/hooks/useAuth";
 import Link from "next/link";
-import { ArrowLeft, RefreshCw, ZoomIn } from "lucide-react";
+import { ArrowLeft, RefreshCw, ZoomIn, X } from "lucide-react";
 
 interface CI {
   ci_id: string;
   name: string;
   ci_type: string;
   status: string;
+  description?: string;
 }
 
 interface CIRelationship {
@@ -100,19 +101,36 @@ function buildGraph(cis: CI[], relationships: CIRelationship[]) {
   return { nodes, edges };
 }
 
+const RELATIONSHIP_TYPES = ["depends_on", "hosted_on", "connected_to", "uses"] as const;
+type RelationshipType = (typeof RELATIONSHIP_TYPES)[number];
+
+interface PendingConnection {
+  source: string;
+  target: string;
+}
+
 export default function CMDBGraphPage() {
   const { isAuthenticated } = useAuthStore();
   const [cis, setCIs] = useState<CI[]>([]);
   const [relationships, setRelationships] = useState<CIRelationship[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [selectedCI, setSelectedCI] = useState<CI | null>(null);
+  const [pendingConnection, setPendingConnection] = useState<PendingConnection | null>(null);
+  const [relType, setRelType] = useState<RelationshipType>("depends_on");
+  const [creating, setCreating] = useState(false);
 
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
 
   const onConnect = useCallback(
-    (params: Connection) => setEdges((eds) => addEdge(params, eds)),
-    [setEdges],
+    (params: Connection) => {
+      if (params.source && params.target) {
+        setPendingConnection({ source: params.source, target: params.target });
+        setRelType("depends_on");
+      }
+    },
+    [],
   );
 
   const fetchData = useCallback(async () => {
@@ -150,6 +168,47 @@ export default function CMDBGraphPage() {
       setLoading(false);
     }
   }, [isAuthenticated, setNodes, setEdges]);
+
+  const onNodeClick = useCallback(
+    (_: React.MouseEvent, node: Node) => {
+      const ci = cis.find((c) => c.ci_id === node.id) ?? null;
+      setSelectedCI(ci);
+    },
+    [cis],
+  );
+
+  const createRelationship = useCallback(async () => {
+    if (!pendingConnection) return;
+    setCreating(true);
+    try {
+      const res = await apiClient.post<CIRelationship>("/cmdb/relationships", {
+        source_ci_id: pendingConnection.source,
+        target_ci_id: pendingConnection.target,
+        relationship_type: relType,
+      });
+      const newRel = res.data;
+      setEdges((eds) =>
+        addEdge(
+          {
+            id: newRel.relationship_id,
+            source: newRel.source_ci_id,
+            target: newRel.target_ci_id,
+            label: newRel.relationship_type,
+            animated: newRel.relationship_type === "depends_on",
+            style: { stroke: "#6b7280" },
+            labelStyle: { fontSize: 10, fill: "#6b7280" },
+          },
+          eds,
+        ),
+      );
+      setRelationships((prev) => [...prev, newRel]);
+    } catch {
+      setError("リレーション作成に失敗しました");
+    } finally {
+      setCreating(false);
+      setPendingConnection(null);
+    }
+  }, [pendingConnection, relType, setEdges]);
 
   useEffect(() => {
     fetchData();
@@ -212,13 +271,15 @@ export default function CMDBGraphPage() {
           <p>CIが登録されていません</p>
         </div>
       ) : (
-        <div className="flex-1" style={{ minHeight: "600px" }}>
+        <div className="flex-1 flex" style={{ minHeight: "600px" }}>
+          <div className="flex-1">
           <ReactFlow
             nodes={nodes}
             edges={edges}
             onNodesChange={onNodesChange}
             onEdgesChange={onEdgesChange}
             onConnect={onConnect}
+            onNodeClick={onNodeClick}
             fitView
             attributionPosition="bottom-right"
           >
@@ -248,6 +309,117 @@ export default function CMDBGraphPage() {
               </div>
             </Panel>
           </ReactFlow>
+          </div>
+
+          {/* CI詳細サイドパネル */}
+          {selectedCI && (
+            <div className="w-72 border-l bg-white p-4 flex flex-col gap-3 overflow-y-auto">
+              <div className="flex items-center justify-between">
+                <h2 className="font-semibold text-gray-900 text-sm">CI詳細</h2>
+                <button
+                  onClick={() => setSelectedCI(null)}
+                  className="text-gray-400 hover:text-gray-700"
+                  aria-label="閉じる"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+              <dl className="space-y-2 text-sm">
+                <div>
+                  <dt className="text-xs text-gray-500">名前</dt>
+                  <dd className="font-medium text-gray-900">{selectedCI.name}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-gray-500">タイプ</dt>
+                  <dd
+                    className="font-medium"
+                    style={{ color: getCIColor(selectedCI.ci_type) }}
+                  >
+                    {selectedCI.ci_type}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-gray-500">ステータス</dt>
+                  <dd>
+                    <span
+                      className="px-1.5 py-0.5 rounded-full text-xs"
+                      style={{
+                        background: selectedCI.status === "Active" ? "#dcfce7" : "#f3f4f6",
+                        color: selectedCI.status === "Active" ? "#16a34a" : "#6b7280",
+                      }}
+                    >
+                      {selectedCI.status}
+                    </span>
+                  </dd>
+                </div>
+                {selectedCI.description && (
+                  <div>
+                    <dt className="text-xs text-gray-500">説明</dt>
+                    <dd className="text-gray-700">{selectedCI.description}</dd>
+                  </div>
+                )}
+              </dl>
+              <Link
+                href={`/cmdb/${selectedCI.ci_id}`}
+                className="mt-auto block text-center px-3 py-2 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700"
+              >
+                CI詳細を見る
+              </Link>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* リレーション作成モーダル */}
+      {pendingConnection && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl p-6 w-80">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-semibold text-gray-900">新規リレーション作成</h3>
+              <button
+                onClick={() => setPendingConnection(null)}
+                className="text-gray-400 hover:text-gray-700"
+              >
+                <X size={16} />
+              </button>
+            </div>
+            <div className="text-xs text-gray-500 mb-3">
+              <span className="font-medium text-gray-700">
+                {cis.find((c) => c.ci_id === pendingConnection.source)?.name ?? pendingConnection.source}
+              </span>
+              {" → "}
+              <span className="font-medium text-gray-700">
+                {cis.find((c) => c.ci_id === pendingConnection.target)?.name ?? pendingConnection.target}
+              </span>
+            </div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              リレーションタイプ
+            </label>
+            <select
+              value={relType}
+              onChange={(e) => setRelType(e.target.value as RelationshipType)}
+              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm mb-4 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              {RELATIONSHIP_TYPES.map((t) => (
+                <option key={t} value={t}>{t}</option>
+              ))}
+            </select>
+            <div className="flex gap-2 justify-end">
+              <button
+                onClick={() => setPendingConnection(null)}
+                className="px-3 py-1.5 text-sm border border-gray-300 rounded-md hover:bg-gray-50"
+              >
+                キャンセル
+              </button>
+              <button
+                onClick={createRelationship}
+                disabled={creating}
+                className="px-3 py-1.5 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
+              >
+                {creating ? "作成中..." : "作成"}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
