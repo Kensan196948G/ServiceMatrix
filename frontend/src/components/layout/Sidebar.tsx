@@ -18,6 +18,10 @@ import {
   Settings,
   Users,
   Bell,
+  Lock,
+  HardDrive,
+  Palette,
+  SlidersHorizontal,
   ChevronRight,
   type LucideIcon,
 } from "lucide-react";
@@ -58,11 +62,14 @@ const navGroups: NavGroup[] = [
     ],
   },
   {
-    label: "システム設定",
+    label: "システム管理",
     items: [
       { label: "ユーザー管理", href: "/settings/users", icon: Users },
-      { label: "通知設定", href: "/settings/notifications", icon: Bell },
-      { label: "システム設定", href: "/settings", icon: Settings },
+      { label: "通知管理", href: "/settings/notifications", icon: Bell },
+      { label: "セキュリティ管理", href: "/settings/security", icon: Lock },
+      { label: "データ管理", href: "/settings/data", icon: HardDrive },
+      { label: "外観設定", href: "/settings/appearance", icon: Palette },
+      { label: "システム全般", href: "/settings", icon: SlidersHorizontal },
     ],
   },
 ];

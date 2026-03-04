@@ -19,10 +19,12 @@ const pageTitles: Record<string, string> = {
   "/ai": "AI分析",
   "/cmdb": "CMDB管理",
   "/audit-logs": "監査ログ",
-  "/settings": "システム設定",
+  "/settings": "システム全般",
   "/settings/users": "ユーザー管理",
-  "/settings/notifications": "通知設定",
-  "/settings/security": "セキュリティ設定",
+  "/settings/notifications": "通知管理",
+  "/settings/security": "セキュリティ管理",
+  "/settings/data": "データ管理",
+  "/settings/appearance": "外観設定",
 };
 
 export default function Header() {
