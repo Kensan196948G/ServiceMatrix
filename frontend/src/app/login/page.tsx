@@ -105,6 +105,13 @@ export default function LoginPage() {
           </button>
         </form>
 
+        {/* デフォルト認証情報ヒント */}
+        <div className="rounded-lg bg-blue-50 p-3 text-xs text-blue-700">
+          <span className="font-semibold">デフォルト:</span> ユーザー名{" "}
+          <code className="rounded bg-blue-100 px-1">admin</code> / パスワード{" "}
+          <code className="rounded bg-blue-100 px-1">admin123</code>
+        </div>
+
         {/* フッター */}
         <p className="text-center text-xs text-gray-400">
           ITIL 4 / ISO 20000 / J-SOX 準拠

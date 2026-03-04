@@ -90,8 +90,8 @@ export default function Sidebar() {
 
       {/* フッター */}
       <div className="border-t border-gray-200 px-6 py-3">
-        <p className="text-xs text-gray-400">ServiceMatrix v0.1.0</p>
-        <p className="text-xs text-gray-400">ITSM Governance Platform</p>
+        <p className="text-xs font-medium text-gray-500">ServiceMatrix</p>
+        <p className="text-xs text-gray-400">v0.1.0 · ITSM Governance Platform</p>
       </div>
     </aside>
   );

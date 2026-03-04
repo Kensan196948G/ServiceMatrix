@@ -59,6 +59,8 @@ export default function DashboardPage() {
           params: { limit: 100, skip: 0 },
         })
         .then((r) => r.data),
+    retry: 1,
+    staleTime: 30000,
   });
 
   const changes = useQuery({
@@ -69,6 +71,8 @@ export default function DashboardPage() {
           params: { limit: 1, skip: 0 },
         })
         .then((r) => r.data),
+    retry: 1,
+    staleTime: 30000,
   });
 
   const problems = useQuery({
@@ -79,6 +83,8 @@ export default function DashboardPage() {
           params: { limit: 1, skip: 0 },
         })
         .then((r) => r.data),
+    retry: 1,
+    staleTime: 30000,
   });
 
   const serviceRequests = useQuery({
@@ -90,16 +96,50 @@ export default function DashboardPage() {
           { params: { limit: 1, skip: 0 } }
         )
         .then((r) => r.data),
+    retry: 1,
+    staleTime: 30000,
   });
 
-  const isLoading =
-    incidents.isLoading ||
-    changes.isLoading ||
-    problems.isLoading ||
-    serviceRequests.isLoading;
+  const hasError =
+    incidents.isError || changes.isError || problems.isError || serviceRequests.isError;
+  const isActuallyLoading =
+    (incidents.isLoading ||
+      changes.isLoading ||
+      problems.isLoading ||
+      serviceRequests.isLoading) &&
+    !hasError;
 
-  if (isLoading) {
+  if (isActuallyLoading) {
     return <LoadingSpinner size="lg" message="ダッシュボードを読み込み中..." />;
+  }
+
+  if (hasError) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12 text-center">
+        <div className="rounded-xl border border-red-200 bg-red-50 p-8 max-w-md">
+          <div className="mb-4 flex h-12 w-12 mx-auto items-center justify-center rounded-full bg-red-100">
+            <AlertTriangle className="h-6 w-6 text-red-600" />
+          </div>
+          <h3 className="text-lg font-semibold text-red-900">バックエンドに接続できません</h3>
+          <p className="mt-2 text-sm text-red-700">
+            APIサーバーへの接続に失敗しました。
+          </p>
+          <p className="mt-1 text-sm text-red-600">
+            <strong>ヒント:</strong> まず{" "}
+            <a href="/login" className="underline">
+              ログイン
+            </a>{" "}
+            してからアクセスしてください。
+          </p>
+          <button
+            onClick={() => window.location.reload()}
+            className="mt-4 rounded-lg bg-red-600 px-4 py-2 text-sm text-white hover:bg-red-700"
+          >
+            再読み込み
+          </button>
+        </div>
+      </div>
+    );
   }
 
   // SLAコンプライアンス計算（インシデントデータから）

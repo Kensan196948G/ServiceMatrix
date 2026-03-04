@@ -96,7 +96,7 @@ def upgrade() -> None:
                 CHECK (closed_at IS NULL OR resolved_at IS NULL OR closed_at >= resolved_at)
         ) PARTITION BY RANGE (created_at)
     """)
-    op.execute("CREATE UNIQUE INDEX uq_incidents_number ON incidents(incident_number)")
+    op.execute("CREATE UNIQUE INDEX uq_incidents_number ON incidents(incident_number, created_at)")
     op.execute("CREATE INDEX ix_incidents_status ON incidents(status)")
     op.execute("CREATE INDEX ix_incidents_priority ON incidents(priority)")
     op.execute("CREATE INDEX ix_incidents_created_at ON incidents(created_at)")
@@ -189,7 +189,7 @@ def upgrade() -> None:
             CONSTRAINT chk_change_risk_score CHECK (risk_score >= 0 AND risk_score <= 100)
         ) PARTITION BY RANGE (created_at)
     """)
-    op.execute("CREATE UNIQUE INDEX uq_changes_number ON changes(change_number)")
+    op.execute("CREATE UNIQUE INDEX uq_changes_number ON changes(change_number, created_at)")
     op.execute("CREATE INDEX ix_changes_status ON changes(status)")
     op.execute("CREATE INDEX ix_changes_created_at ON changes(created_at)")
     # 2026年月次パーティション

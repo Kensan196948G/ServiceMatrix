@@ -68,7 +68,7 @@ env_set() {
 }
 
 # ---- バックエンドポート (8000→8001→8002) ----
-BACKEND_PORT=$(env_get "PORT" || true)
+BACKEND_PORT=$(env_get "BACKEND_PORT" || true)
 BACKEND_PORT="${BACKEND_PORT:-8000}"
 FREE_BACKEND=$(find_free_port 8000 8001 8002) || {
   log "FATAL: No free backend port available (tried 8000-8002)"
@@ -76,7 +76,7 @@ FREE_BACKEND=$(find_free_port 8000 8001 8002) || {
 }
 if [[ "$FREE_BACKEND" != "$BACKEND_PORT" ]]; then
   log "Backend port conflict: $BACKEND_PORT → using $FREE_BACKEND"
-  env_set "PORT" "$FREE_BACKEND"
+  env_set "BACKEND_PORT" "$FREE_BACKEND"
 fi
 log "Backend port: $FREE_BACKEND"
 
@@ -93,18 +93,10 @@ if [[ "$FREE_NODE" != "$NODE_PORT" ]]; then
 fi
 log "Frontend port: $FREE_NODE"
 
-# ---- PostgreSQL ポート (5432→5433) ----
+# ---- PostgreSQL ポート確認のみ（ServiceMatrixはPostgreSQLに接続するだけで起動しない） ----
 PG_PORT=$(env_get "POSTGRES_PORT" || true)
 PG_PORT="${PG_PORT:-5432}"
-FREE_PG=$(find_free_port 5432 5433) || {
-  log "WARNING: No free PostgreSQL port (tried 5432-5433); relying on running instance"
-  FREE_PG="$PG_PORT"
-}
-if [[ "$FREE_PG" != "$PG_PORT" ]]; then
-  log "PostgreSQL port conflict: $PG_PORT → using $FREE_PG"
-  env_set "POSTGRES_PORT" "$FREE_PG"
-fi
-log "PostgreSQL port: $FREE_PG"
+log "PostgreSQL port: $PG_PORT (using existing PostgreSQL instance)"
 
 # ---- Redis ポート (6379→6380) ----
 REDIS_PORT=$(env_get "REDIS_PORT" || true)
