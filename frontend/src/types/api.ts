@@ -30,6 +30,16 @@ export interface UserResponse {
 
 // --- インシデント管理 ---
 
+export interface IncidentCommentResponse {
+  comment_id: string;
+  incident_id: string;
+  author_id: string;
+  author_username: string;
+  body: string;
+  attachment_url: string | null;
+  created_at: string;
+}
+
 export interface IncidentResponse {
   incident_id: string;
   incident_number: string;
@@ -188,6 +198,20 @@ export interface AuditVerifyResult {
   valid: boolean;
   total_records: number;
   violations: number;
+}
+
+export interface AuditStats {
+  total_operations: number;
+  unique_users: number;
+  by_action: Record<string, number>;
+  by_resource: Record<string, number>;
+  recent_activity: Array<{
+    timestamp: string;
+    user: string | null;
+    action: string;
+    resource_type: string | null;
+    resource_id: string | null;
+  }>;
 }
 
 /** SLA計測値 */

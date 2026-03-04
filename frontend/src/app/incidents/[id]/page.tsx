@@ -8,7 +8,8 @@ import {
   RefreshCw, User, Tag, Calendar, MessageSquare, Send, Brain, Loader2, Sparkles
 } from "lucide-react";
 import apiClient from "@/lib/api";
-import type { IncidentResponse } from "@/types/api";
+import { useAuthStore } from "@/hooks/useAuth";
+import type { IncidentCommentResponse, IncidentResponse } from "@/types/api";
 
 const PRIORITY_COLORS: Record<string, string> = {
   P1: "bg-red-100 text-red-800 border-red-200",
@@ -104,8 +105,8 @@ export default function IncidentDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { user: currentUser } = useAuthStore();
   const [comment, setComment] = useState("");
-  const [comments, setComments] = useState<{ text: string; time: string }[]>([]);
   const [aiTriageResult, setAiTriageResult] = useState<{
     priority: string; category: string; confidence: number; reasoning: string;
   } | null>(null);
@@ -115,6 +116,29 @@ export default function IncidentDetailPage() {
     queryKey: ["incident", id],
     queryFn: () => apiClient.get(`/incidents/${id}`).then(r => r.data),
     enabled: !!id,
+  });
+
+  const { data: comments = [] } = useQuery<IncidentCommentResponse[]>({
+    queryKey: ["incident-comments", id],
+    queryFn: () => apiClient.get(`/incidents/${id}/comments`).then(r => r.data),
+    enabled: !!id,
+  });
+
+  const postCommentMutation = useMutation({
+    mutationFn: (body: string) =>
+      apiClient.post(`/incidents/${id}/comments`, { body }).then(r => r.data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["incident-comments", id] });
+      setComment("");
+    },
+  });
+
+  const deleteCommentMutation = useMutation({
+    mutationFn: (commentId: string) =>
+      apiClient.delete(`/incidents/${id}/comments/${commentId}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["incident-comments", id] });
+    },
   });
 
   const transitionMutation = useMutation({
@@ -128,8 +152,7 @@ export default function IncidentDetailPage() {
 
   const handleComment = () => {
     if (!comment.trim()) return;
-    setComments(prev => [...prev, { text: comment, time: new Date().toLocaleString("ja-JP") }]);
-    setComment("");
+    postCommentMutation.mutate(comment);
   };
 
   const runAiTriage = async () => {
@@ -329,28 +352,44 @@ export default function IncidentDetailPage() {
               {comments.length === 0 ? (
                 <p className="text-sm text-gray-400">コメントはまだありません</p>
               ) : (
-                comments.map((c, i) => (
-                  <div key={i} className="rounded-lg bg-gray-50 px-4 py-3">
-                    <p className="text-sm text-gray-800">{c.text}</p>
-                    <p className="text-xs text-gray-400 mt-1">{c.time}</p>
+                comments.map((c) => (
+                  <div key={c.comment_id} className="rounded-lg bg-gray-50 px-4 py-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <p className="text-sm font-medium text-gray-700">{c.author_username}</p>
+                        <p className="text-sm text-gray-800 mt-0.5">{c.body}</p>
+                        <p className="text-xs text-gray-400 mt-1">
+                          {new Date(c.created_at).toLocaleString("ja-JP")}
+                        </p>
+                      </div>
+                      {(currentUser?.user_id === c.author_id || currentUser?.role === "SystemAdmin") && (
+                        <button
+                          onClick={() => deleteCommentMutation.mutate(c.comment_id)}
+                          disabled={deleteCommentMutation.isPending}
+                          className="flex-shrink-0 text-xs text-red-400 hover:text-red-600 disabled:opacity-50 mt-0.5"
+                        >
+                          削除
+                        </button>
+                      )}
+                    </div>
                   </div>
                 ))
               )}
             </div>
             <div className="flex gap-2">
-              <input
-                type="text"
+              <textarea
                 value={comment}
                 onChange={(e) => setComment(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleComment()}
                 placeholder="コメントを入力..."
-                className="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                rows={2}
+                className="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
               />
               <button
                 onClick={handleComment}
-                className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700 transition"
+                disabled={postCommentMutation.isPending || !comment.trim()}
+                className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700 disabled:opacity-50 transition"
               >
-                <Send className="w-3.5 h-3.5" /> 送信
+                <Send className="w-3.5 h-3.5" /> {postCommentMutation.isPending ? "送信中..." : "送信"}
               </button>
             </div>
           </div>

@@ -18,6 +18,7 @@ from src.schemas.problem import (
     ProblemResponse,
     ProblemStatusTransition,
     ProblemUpdate,
+    RCARequest,
 )
 from src.schemas.rca import RCAResultSchema
 from src.services import problem_service
@@ -182,3 +183,70 @@ async def analyze_problem_rca(
     """根本原因分析（RCA）を自動実行し、結果を返す"""
     rca_result = await rca_service.analyze_problem(db, str(problem_id))
     return RCAResultSchema(**rca_result.__dict__)
+
+
+@router.post(
+    "/{problem_id}/rca",
+    response_model=ProblemResponse,
+    summary="RCA保存",
+    description="根本原因分析（RCA）を保存します。",
+)
+async def save_rca(
+    problem_id: uuid.UUID,
+    data: RCARequest,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[
+        User,
+        Depends(
+            require_role(UserRole.SYSTEM_ADMIN, UserRole.SERVICE_MANAGER, UserRole.INCIDENT_MANAGER)
+        ),
+    ],
+):
+    """根本原因分析（RCA）を保存する"""
+    result = await db.execute(select(Problem).where(Problem.problem_id == problem_id))
+    problem = result.scalar_one_or_none()
+    if not problem:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="問題が見つかりません")
+
+    # root_cause に contributing_factors と permanent_fix も含めて保存
+    rca_text = data.root_cause
+    if data.contributing_factors:
+        factors = "\n".join(f"- {f}" for f in data.contributing_factors)
+        rca_text += f"\n\n【寄与要因】\n{factors}"
+    if data.permanent_fix:
+        rca_text += f"\n\n【恒久的修正方法】\n{data.permanent_fix}"
+
+    problem.root_cause = rca_text
+    await db.flush()
+    await db.refresh(problem)
+    return problem
+
+
+@router.post(
+    "/{problem_id}/mark-known-error",
+    response_model=ProblemResponse,
+    summary="既知エラー登録",
+    description="問題を既知エラー（Known Error DB）として登録します。",
+)
+async def mark_known_error(
+    problem_id: uuid.UUID,
+    data: KnownErrorUpdate,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[
+        User,
+        Depends(
+            require_role(UserRole.SYSTEM_ADMIN, UserRole.SERVICE_MANAGER, UserRole.INCIDENT_MANAGER)
+        ),
+    ],
+):
+    """問題を既知エラーとしてマークする"""
+    result = await db.execute(select(Problem).where(Problem.problem_id == problem_id))
+    problem = result.scalar_one_or_none()
+    if not problem:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="問題が見つかりません")
+
+    try:
+        problem = await problem_service.mark_as_known_error(db, problem, data.workaround)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e)) from e
+    return problem

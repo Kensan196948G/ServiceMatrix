@@ -35,7 +35,8 @@ VALID_CHANGE_TRANSITIONS: dict[str, set[str]] = {
     "Rejected": {"Draft"},
     "Scheduled": {"In_Progress", "Cancelled"},
     "In_Progress": {"Completed", "Failed"},
-    "Completed": set(),
+    "Completed": {"Closed"},
+    "Closed": set(),
     "Cancelled": set(),
     "Failed": {"Draft"},
 }

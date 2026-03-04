@@ -1,14 +1,18 @@
 """CMDB構成管理API"""
 
+import csv
+import io
+import json
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Response, UploadFile, status
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.database import get_db
-from src.middleware.rbac import get_current_user
-from src.models.user import User
+from src.middleware.rbac import get_current_user, require_role
+from src.models.user import User, UserRole
 from src.schemas.cmdb import (
     CICreate,
     CIRelationshipCreate,
@@ -106,3 +110,111 @@ async def analyze_impact(
     if not ci:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="CIが見つかりません")
     return await cmdb_service.analyze_impact(db, ci_id)
+
+
+class CIImportResult(BaseModel):
+    created: int
+    failed: int
+    errors: list[str]
+
+
+@router.get("/export", summary="CI一括エクスポート（CSV/JSON）")
+async def export_cis(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+    format: str = Query(default="json", pattern="^(csv|json)$"),
+) -> Response:
+    """全CIをCSVまたはJSON形式でエクスポートする"""
+    cis, _ = await cmdb_service.get_cis(db, None, None, 0, 10000)
+
+    if format == "csv":
+        output = io.StringIO()
+        fieldnames = ["ci_id", "ci_name", "ci_type", "ci_class", "status", "version", "description"]
+        writer = csv.DictWriter(output, fieldnames=fieldnames)
+        writer.writeheader()
+        for ci in cis:
+            writer.writerow(
+                {
+                    "ci_id": str(ci.ci_id),
+                    "ci_name": ci.ci_name,
+                    "ci_type": ci.ci_type,
+                    "ci_class": ci.ci_class or "",
+                    "status": ci.status,
+                    "version": ci.version or "",
+                    "description": ci.description or "",
+                }
+            )
+        return Response(
+            content=output.getvalue(),
+            media_type="text/csv",
+            headers={"Content-Disposition": "attachment; filename=cmdb_export.csv"},
+        )
+    else:
+        data = [
+            {
+                "ci_id": str(ci.ci_id),
+                "ci_name": ci.ci_name,
+                "ci_type": ci.ci_type,
+                "ci_class": ci.ci_class,
+                "status": ci.status,
+                "version": ci.version,
+                "description": ci.description,
+            }
+            for ci in cis
+        ]
+        return Response(
+            content=json.dumps(data, ensure_ascii=False, default=str),
+            media_type="application/json",
+            headers={"Content-Disposition": "attachment; filename=cmdb_export.json"},
+        )
+
+
+@router.post("/import", response_model=CIImportResult, summary="CI一括インポート（CSV/JSON）")
+async def import_cis(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[
+        User,
+        Depends(require_role(UserRole.SYSTEM_ADMIN, UserRole.SERVICE_MANAGER)),
+    ],
+    file: UploadFile = File(...),
+) -> CIImportResult:
+    """CSV/JSONファイルからCI一括登録"""
+    content = await file.read()
+    created = 0
+    failed = 0
+    errors: list[str] = []
+
+    try:
+        filename = file.filename or ""
+        if filename.endswith(".json"):
+            rows = json.loads(content)
+        else:
+            text = content.decode("utf-8-sig")
+            reader = csv.DictReader(io.StringIO(text))
+            rows = list(reader)
+
+        for row in rows:
+            try:
+                ci_data: dict = {
+                    "ci_name": row.get("ci_name") or row.get("name") or "",
+                    "ci_type": row.get("ci_type") or "Server",
+                    "status": row.get("status") or "Active",
+                    "description": row.get("description") or None,
+                }
+                if row.get("ci_class"):
+                    ci_data["ci_class"] = row["ci_class"]
+                if row.get("version"):
+                    ci_data["version"] = row["version"]
+                if not ci_data["ci_name"]:
+                    errors.append(f"CI名が空: {row}")
+                    failed += 1
+                    continue
+                await cmdb_service.create_ci(db, ci_data)
+                created += 1
+            except Exception as e:
+                errors.append(str(e))
+                failed += 1
+    except Exception as e:
+        errors.append(f"ファイル解析エラー: {e}")
+
+    return CIImportResult(created=created, failed=failed, errors=errors[:10])

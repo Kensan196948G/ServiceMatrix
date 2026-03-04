@@ -58,8 +58,8 @@ def test_valid_change_transitions_draft():
 
 
 def test_valid_change_transitions_completed():
-    """Completed状態は終端（遷移なし）"""
-    assert len(VALID_CHANGE_TRANSITIONS["Completed"]) == 0
+    """Completed状態からClosedへ遷移できること"""
+    assert "Closed" in VALID_CHANGE_TRANSITIONS["Completed"]
 
 
 def test_valid_change_transitions_cancelled():

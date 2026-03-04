@@ -32,6 +32,11 @@ class ChangeUpdate(BaseModel):
     assigned_to: uuid.UUID | None = None
 
 
+class ScheduleRequest(BaseModel):
+    scheduled_start_at: datetime
+    scheduled_end_at: datetime | None = None
+
+
 class ChangeStatusTransition(BaseModel):
     new_status: str
     notes: str | None = None

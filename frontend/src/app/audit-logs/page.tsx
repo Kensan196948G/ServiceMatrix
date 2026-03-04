@@ -1,17 +1,18 @@
 /**
  * 監査ログページ
- * 監査ログ一覧・フィルター・ハッシュチェーン整合性バッジを提供
+ * 統計カード・操作種別グラフ・監査ログ一覧・フィルター・ハッシュチェーン整合性バッジを提供
  */
 "use client";
 
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ChevronLeft, ChevronRight, ShieldCheck, ShieldX, Download } from "lucide-react";
+import { ChevronLeft, ChevronRight, ShieldCheck, ShieldX, Download, Activity, Users, BarChart2, AlertTriangle } from "lucide-react";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import apiClient from "@/lib/api";
 import Table from "@/components/ui/Table";
 import Badge from "@/components/ui/Badge";
 import LoadingSpinner from "@/components/ui/LoadingSpinner";
-import type { AuditLog, AuditVerifyResult, PaginatedResponse } from "@/types/api";
+import type { AuditLog, AuditVerifyResult, AuditStats, PaginatedResponse } from "@/types/api";
 
 const PAGE_SIZE = 20;
 
@@ -81,6 +82,13 @@ export default function AuditLogsPage() {
     queryKey: ["audit-verify"],
     queryFn: () =>
       apiClient.get<AuditVerifyResult>("/audit/verify").then((r) => r.data),
+    retry: false,
+  });
+
+  const { data: statsData } = useQuery<AuditStats>({
+    queryKey: ["audit-stats"],
+    queryFn: () =>
+      apiClient.get<AuditStats>("/audit/stats").then((r) => r.data),
     retry: false,
   });
 
@@ -168,14 +176,23 @@ export default function AuditLogsPage() {
             </div>
           )}
           <div className="flex items-center gap-1">
+            <a
+              href={`${process.env.NEXT_PUBLIC_API_URL ?? ""}/api/v1/audit/logs/export`}
+              download="audit_logs.csv"
+              className="flex items-center gap-1.5 rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
+              title="CSVエクスポート（サーバー）"
+            >
+              <Download className="h-4 w-4" />
+              CSV
+            </a>
             <button
               onClick={exportCSV}
               disabled={!logs.length}
               className="flex items-center gap-1.5 rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
-              title="CSVエクスポート"
+              title="現在ページをCSVエクスポート"
             >
               <Download className="h-4 w-4" />
-              CSV
+              現在ページ
             </button>
             <button
               onClick={exportJSON}
@@ -190,6 +207,56 @@ export default function AuditLogsPage() {
           <span className="text-sm text-gray-500">{total} 件</span>
         </div>
       </div>
+
+      {/* 統計カード */}
+      {statsData && (
+        <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
+          <div className="rounded-lg border border-gray-200 bg-white p-4">
+            <div className="flex items-center gap-2 text-gray-500">
+              <Activity className="h-4 w-4" />
+              <span className="text-xs font-medium">総操作数</span>
+            </div>
+            <p className="mt-2 text-2xl font-bold text-gray-900">{statsData.total_operations.toLocaleString()}</p>
+          </div>
+          <div className="rounded-lg border border-gray-200 bg-white p-4">
+            <div className="flex items-center gap-2 text-gray-500">
+              <Users className="h-4 w-4" />
+              <span className="text-xs font-medium">ユニークユーザー</span>
+            </div>
+            <p className="mt-2 text-2xl font-bold text-gray-900">{statsData.unique_users.toLocaleString()}</p>
+          </div>
+          <div className="rounded-lg border border-gray-200 bg-white p-4">
+            <div className="flex items-center gap-2 text-gray-500">
+              <BarChart2 className="h-4 w-4" />
+              <span className="text-xs font-medium">リソース種別数</span>
+            </div>
+            <p className="mt-2 text-2xl font-bold text-gray-900">{Object.keys(statsData.by_resource).length}</p>
+          </div>
+          <div className="rounded-lg border border-gray-200 bg-white p-4">
+            <div className="flex items-center gap-2 text-gray-500">
+              <AlertTriangle className="h-4 w-4" />
+              <span className="text-xs font-medium">DELETE操作</span>
+            </div>
+            <p className="mt-2 text-2xl font-bold text-red-600">{(statsData.by_action["DELETE"] ?? 0).toLocaleString()}</p>
+          </div>
+        </div>
+      )}
+
+      {/* 操作種別グラフ */}
+      {statsData && Object.keys(statsData.by_action).length > 0 && (
+        <div className="mb-6 rounded-lg border border-gray-200 bg-white p-4">
+          <h2 className="mb-3 text-sm font-semibold text-gray-700">操作種別件数</h2>
+          <ResponsiveContainer width="100%" height={180}>
+            <BarChart data={Object.entries(statsData.by_action).map(([action, count]) => ({ action, count }))}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="action" tick={{ fontSize: 12 }} />
+              <YAxis tick={{ fontSize: 12 }} />
+              <Tooltip />
+              <Bar dataKey="count" fill="#3b82f6" radius={[3, 3, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      )}
 
       {/* フィルターバー */}
       <div className="mb-4 flex flex-wrap gap-3">

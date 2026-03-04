@@ -90,3 +90,20 @@ class IncidentResponse(BaseModel):
     updated_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class IncidentCommentCreate(BaseModel):
+    body: str = Field(..., min_length=1, max_length=5000)
+    attachment_url: str | None = None
+
+
+class IncidentCommentResponse(BaseModel):
+    comment_id: uuid.UUID
+    incident_id: uuid.UUID
+    author_id: uuid.UUID
+    author_username: str
+    body: str
+    attachment_url: str | None
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
