@@ -13,6 +13,8 @@ import {
   Search,
   ClipboardList,
   Settings,
+  ShieldAlert,
+  Brain,
   type LucideIcon,
 } from "lucide-react";
 
@@ -34,6 +36,8 @@ const navItems: NavItem[] = [
     href: "/service-requests",
     icon: ClipboardList,
   },
+  { label: "SLA監視", href: "/sla", icon: ShieldAlert },
+  { label: "AI分析", href: "/ai", icon: Brain },
 ];
 
 export default function Sidebar() {
