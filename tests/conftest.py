@@ -1,5 +1,9 @@
 """pytest fixtures - 非同期DBセッション・テストクライアント"""
 import asyncio
+import os
+
+os.environ.setdefault("TESTING", "true")
+
 import pytest
 import pytest_asyncio
 from httpx import AsyncClient, ASGITransport

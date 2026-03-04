@@ -1,0 +1,72 @@
+global:
+  namespace: servicematrix
+  imageRegistry: ""
+
+backend:
+  image:
+    repository: servicematrix-backend
+    tag: latest
+    pullPolicy: IfNotPresent
+  replicaCount: 2
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "250m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 70
+  env:
+    SECRET_KEY: "change-me-in-production"
+    POSTGRES_HOST: "servicematrix-postgres"
+    POSTGRES_DB: "servicematrix"
+    POSTGRES_USER: "servicematrix"
+    REDIS_URL: "redis://servicematrix-redis:6379/0"
+    ENVIRONMENT: "production"
+    LOG_LEVEL: "INFO"
+
+frontend:
+  image:
+    repository: servicematrix-frontend
+    tag: latest
+    pullPolicy: IfNotPresent
+  replicaCount: 2
+  resources:
+    requests:
+      memory: "128Mi"
+      cpu: "100m"
+    limits:
+      memory: "256Mi"
+      cpu: "250m"
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 5
+    targetCPUUtilizationPercentage: 70
+  env:
+    NEXT_PUBLIC_API_URL: "http://servicematrix-backend:8000"
+
+postgres:
+  image: postgres:16-alpine
+  storage: 10Gi
+  storageClassName: ""
+  env:
+    POSTGRES_DB: servicematrix
+    POSTGRES_USER: servicematrix
+    POSTGRES_PASSWORD: "change-me-in-production"
+
+redis:
+  image: redis:7-alpine
+  replicaCount: 1
+  password: "change-me-in-production"
+
+ingress:
+  enabled: true
+  className: nginx
+  host: servicematrix.example.com
+  tls: true
+  tlsSecretName: servicematrix-tls

@@ -1,5 +1,5 @@
 /**
- * Sidebar コンポーネント - ライトテーマサイドバー
+ * Sidebar コンポーネント - ライトテーマサイドバー（モバイルドロワー対応）
  */
 "use client";
 
@@ -11,6 +11,7 @@ import {
   GitPullRequest,
   HelpCircle,
   ClipboardList,
+  BookOpen,
   ShieldAlert,
   Brain,
   Database,
@@ -24,6 +25,8 @@ import {
   SlidersHorizontal,
   ChevronRight,
   CalendarDays,
+  BarChart2,
+  X,
   type LucideIcon,
 } from "lucide-react";
 
@@ -36,6 +39,11 @@ interface NavItem {
   label: string;
   href: string;
   icon: LucideIcon;
+}
+
+interface SidebarProps {
+  isOpen?: boolean;
+  onClose?: () => void;
 }
 
 const navGroups: NavGroup[] = [
@@ -52,6 +60,7 @@ const navGroups: NavGroup[] = [
       { label: "変更カレンダー", href: "/changes/calendar", icon: CalendarDays },
       { label: "問題管理", href: "/problems", icon: HelpCircle },
       { label: "サービスリクエスト", href: "/service-requests", icon: ClipboardList },
+      { label: "サービスカタログ", href: "/service-catalog", icon: BookOpen },
     ],
   },
   {
@@ -61,6 +70,7 @@ const navGroups: NavGroup[] = [
       { label: "AI分析", href: "/ai", icon: Brain },
       { label: "CMDB管理", href: "/cmdb", icon: Database },
       { label: "監査ログ", href: "/audit-logs", icon: ScrollText },
+      { label: "レポート", href: "/reports", icon: BarChart2 },
     ],
   },
   {
@@ -76,14 +86,14 @@ const navGroups: NavGroup[] = [
   },
 ];
 
-export default function Sidebar() {
+export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
   const pathname = usePathname();
 
-  return (
+  const sidebarContent = (
     <aside className="flex h-full w-60 flex-col bg-white border-r border-gray-200 flex-shrink-0">
       {/* ロゴ */}
-      <div className="flex h-14 items-center px-4 border-b border-gray-200">
-        <Link href="/" className="flex items-center gap-2.5">
+      <div className="flex h-14 items-center justify-between px-4 border-b border-gray-200">
+        <Link href="/" className="flex items-center gap-2.5" onClick={onClose}>
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600 font-bold text-white text-sm">
             SM
           </div>
@@ -92,6 +102,16 @@ export default function Sidebar() {
             <div className="text-[10px] text-gray-400 leading-tight">ITSM Governance</div>
           </div>
         </Link>
+        {/* モバイル閉じるボタン */}
+        {onClose && (
+          <button
+            onClick={onClose}
+            className="md:hidden rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+            aria-label="サイドバーを閉じる"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        )}
       </div>
 
       {/* ナビゲーション */}
@@ -113,6 +133,7 @@ export default function Sidebar() {
                   <li key={item.href}>
                     <Link
                       href={item.href}
+                      onClick={onClose}
                       className={`flex items-center justify-between rounded-md px-3 py-2 text-sm transition-colors group ${
                         isActive
                           ? "bg-blue-50 text-blue-700 font-medium"
@@ -138,5 +159,30 @@ export default function Sidebar() {
         <p className="text-[10px] text-gray-400">v1.0.0 · ITIL 4 準拠</p>
       </div>
     </aside>
+  );
+
+  return (
+    <>
+      {/* デスクトップ: 固定サイドバー */}
+      <div className="hidden md:flex h-full">
+        {sidebarContent}
+      </div>
+
+      {/* モバイル: オーバーレイドロワー */}
+      {isOpen && (
+        <div className="fixed inset-0 z-50 flex md:hidden">
+          {/* オーバーレイ背景 */}
+          <div
+            className="absolute inset-0 bg-black/40"
+            onClick={onClose}
+            aria-hidden="true"
+          />
+          {/* サイドバー本体 */}
+          <div className="relative flex h-full">
+            {sidebarContent}
+          </div>
+        </div>
+      )}
+    </>
   );
 }

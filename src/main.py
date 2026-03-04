@@ -4,10 +4,13 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 
 from src.api.v1.router import api_router
 from src.core.config import settings
 from src.core.logging import setup_logging
+from src.core.rate_limit import limiter
 from src.middleware.audit import AuditMiddleware
 from src.middleware.metrics import MetricsMiddleware
 from src.middleware.rate_limit import RateLimitMiddleware
@@ -139,6 +142,9 @@ Bearer Token (JWT) 認証を使用します。
         app.add_middleware(SecurityHeadersMiddleware)
     if settings.rate_limit_enabled:
         app.add_middleware(RateLimitMiddleware, calls=settings.rate_limit_per_minute, period=60)
+
+    app.state.limiter = limiter
+    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)  # type: ignore[arg-type]
 
     app.include_router(api_router, prefix="/api/v1")
 

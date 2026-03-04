@@ -62,6 +62,7 @@ class ServiceRequestResponse(BaseModel):
     approved_by: uuid.UUID | None
     due_date: datetime | None
     fulfilled_at: datetime | None
+    catalog_id: uuid.UUID | None = None
     created_at: datetime
     updated_at: datetime
 

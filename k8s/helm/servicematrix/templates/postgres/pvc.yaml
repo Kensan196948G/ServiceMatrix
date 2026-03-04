@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "servicematrix.fullname" . }}-postgres-pvc
+  namespace: {{ include "servicematrix.namespace" . }}
+  labels:
+    {{- include "servicematrix.labels" . | nindent 4 }}
+    app.kubernetes.io/component: postgres
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: {{ .Values.postgres.storageClassName | default "" | quote }}
+  resources:
+    requests:
+      storage: {{ .Values.postgres.storage }}

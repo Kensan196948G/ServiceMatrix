@@ -53,13 +53,16 @@ async def test_login_success_direct():
     db = _mock_db_with_user(user)
 
     creds = LoginRequest(username="testadmin", password="testpass123")
+    mock_request = MagicMock()
+    mock_request.client = MagicMock()
+    mock_request.client.host = "127.0.0.1"
 
     with (
         patch("src.api.v1.auth.verify_password", return_value=True),
         patch("src.api.v1.auth.create_access_token", return_value="access.tok"),
         patch("src.api.v1.auth.create_refresh_token", return_value="refresh.tok"),
     ):
-        result = await login(credentials=creds, db=db)
+        result = await login(request=mock_request, credentials=creds, db=db)
 
     assert result.access_token == "access.tok"
     assert result.refresh_token == "refresh.tok"
@@ -76,12 +79,13 @@ async def test_login_wrong_password_direct():
     db = _mock_db_with_user(user)
 
     creds = LoginRequest(username="testadmin", password="wrong")
+    mock_request = MagicMock()
 
     with (
         patch("src.api.v1.auth.verify_password", return_value=False),
         pytest.raises(HTTPException) as exc_info,
     ):
-        await login(credentials=creds, db=db)
+        await login(request=mock_request, credentials=creds, db=db)
 
     assert exc_info.value.status_code == 401
 
@@ -92,9 +96,10 @@ async def test_login_user_not_found_direct():
 
     db = _mock_db_with_user(None)
     creds = LoginRequest(username="ghost", password="any")
+    mock_request = MagicMock()
 
     with pytest.raises(HTTPException) as exc_info:
-        await login(credentials=creds, db=db)
+        await login(request=mock_request, credentials=creds, db=db)
 
     assert exc_info.value.status_code == 401
 
@@ -107,12 +112,13 @@ async def test_login_inactive_user_direct():
     db = _mock_db_with_user(user)
 
     creds = LoginRequest(username="testadmin", password="testpass123")
+    mock_request = MagicMock()
 
     with (
         patch("src.api.v1.auth.verify_password", return_value=True),
         pytest.raises(HTTPException) as exc_info,
     ):
-        await login(credentials=creds, db=db)
+        await login(request=mock_request, credentials=creds, db=db)
 
     assert exc_info.value.status_code == 403
 

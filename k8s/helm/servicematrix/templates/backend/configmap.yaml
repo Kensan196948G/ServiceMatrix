@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "servicematrix.fullname" . }}-backend-config
+  namespace: {{ include "servicematrix.namespace" . }}
+  labels:
+    {{- include "servicematrix.labels" . | nindent 4 }}
+    app.kubernetes.io/component: backend
+data:
+  POSTGRES_HOST: {{ .Values.backend.env.POSTGRES_HOST | quote }}
+  POSTGRES_DB: {{ .Values.backend.env.POSTGRES_DB | quote }}
+  POSTGRES_USER: {{ .Values.backend.env.POSTGRES_USER | quote }}
+  REDIS_URL: {{ .Values.backend.env.REDIS_URL | quote }}
+  ENVIRONMENT: {{ .Values.backend.env.ENVIRONMENT | default "production" | quote }}
+  LOG_LEVEL: {{ .Values.backend.env.LOG_LEVEL | default "INFO" | quote }}
