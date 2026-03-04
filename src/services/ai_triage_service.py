@@ -178,7 +178,6 @@ class AITriageService:
         )
         return triage_result
 
-
     async def find_similar_incidents(
         self, db: AsyncSession, title: str, description: str | None, limit: int = 5
     ) -> list[dict]:
@@ -197,9 +196,7 @@ class AITriageService:
         for w in query_words:
             query_counts[w] = query_counts.get(w, 0) + 1
 
-        result = await db.execute(
-            select(Incident).order_by(Incident.created_at.desc()).limit(200)
-        )
+        result = await db.execute(select(Incident).order_by(Incident.created_at.desc()).limit(200))
         incidents = result.scalars().all()
 
         scores: list[dict] = []
@@ -211,7 +208,9 @@ class AITriageService:
             for w in doc_words:
                 doc_counts[w] = doc_counts.get(w, 0) + 1
 
-            common = sum(min(query_counts[w], doc_counts[w]) for w in query_counts if w in doc_counts)
+            common = sum(
+                min(query_counts[w], doc_counts[w]) for w in query_counts if w in doc_counts
+            )
             denom = (sum(v * v for v in query_counts.values()) ** 0.5) * (
                 sum(v * v for v in doc_counts.values()) ** 0.5
             )

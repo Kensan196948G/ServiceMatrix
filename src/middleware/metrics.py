@@ -1,4 +1,5 @@
 """HTTPリクエストメトリクス収集ミドルウェア"""
+
 import time
 
 from fastapi import Request

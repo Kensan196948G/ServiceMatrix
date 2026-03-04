@@ -71,10 +71,15 @@ async def create_incident(db: AsyncSession, data: dict[str, Any]) -> Incident:
     metrics.incidents_created_total += 1
 
     from src.services.notification_manager import manager  # noqa: PLC0415
+
     await manager.broadcast_incident_update(
         str(incident.incident_id),
         "created",
-        {"incident_number": incident.incident_number, "priority": incident.priority, "status": incident.status},
+        {
+            "incident_number": incident.incident_number,
+            "priority": incident.priority,
+            "status": incident.status,
+        },
     )
     return incident
 
@@ -120,6 +125,7 @@ async def transition_status(
     await db.refresh(incident)
 
     from src.services.notification_manager import manager  # noqa: PLC0415
+
     action = "closed" if new_status == "Closed" else "updated"
     await manager.broadcast_incident_update(
         str(incident.incident_id),

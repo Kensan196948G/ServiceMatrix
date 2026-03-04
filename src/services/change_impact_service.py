@@ -1,6 +1,7 @@
 """変更影響分析サービス - RFC自動リスク評価・影響CI特定・競合チェック"""
-from dataclasses import dataclass, field
-from datetime import datetime, timedelta, UTC
+
+from dataclasses import dataclass
+from datetime import datetime, timedelta
 
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -20,8 +21,8 @@ CONFLICT_WINDOW_DAYS = 3
 @dataclass
 class ChangeImpactResult:
     change_id: str
-    risk_level: str           # "Critical"/"High"/"Medium"/"Low"
-    risk_score: float         # 0.0-1.0
+    risk_level: str  # "Critical"/"High"/"Medium"/"Low"
+    risk_score: float  # 0.0-1.0
     affected_cis: list[dict]  # [{"ci_id": str, "name": str, "ci_type": str}]
     conflicting_changes: list[dict]  # [{"change_id": str, "title": str, "scheduled_date": str}]
     recommendations: list[str]
@@ -34,6 +35,7 @@ class ChangeImpactService:
     async def analyze_impact(self, db: AsyncSession, change_id: str) -> ChangeImpactResult:
         """変更のリスク評価・影響CI特定・競合チェックを実行"""
         import uuid as _uuid
+
         result = await db.execute(select(Change).where(Change.change_id == _uuid.UUID(change_id)))
         change = result.scalar_one_or_none()
         if change is None:
@@ -108,17 +110,10 @@ class ChangeImpactService:
             return []
 
         conditions = [ConfigurationItem.ci_name.ilike(f"%{kw}%") for kw in keywords]
-        q = (
-            select(ConfigurationItem)
-            .where(or_(*conditions))
-            .limit(MAX_AFFECTED_CIS)
-        )
+        q = select(ConfigurationItem).where(or_(*conditions)).limit(MAX_AFFECTED_CIS)
         rows = await db.execute(q)
         cis = rows.scalars().all()
-        return [
-            {"ci_id": str(ci.ci_id), "name": ci.ci_name, "ci_type": ci.ci_type}
-            for ci in cis
-        ]
+        return [{"ci_id": str(ci.ci_id), "name": ci.ci_name, "ci_type": ci.ci_type} for ci in cis]
 
     async def _find_conflicting_changes(self, db: AsyncSession, change: Change) -> list[dict]:
         """±3日以内に予定されている他のChange（最大5件）"""
@@ -189,7 +184,9 @@ class ChangeImpactService:
         parts = [
             f"リスクスコア {risk_score:.2f} に基づきリスクレベル '{risk_level}' と判定。",
             f"影響CI: {len(affected_cis)}件。" if affected_cis else "影響CIなし。",
-            f"競合変更: {len(conflicting_changes)}件検出。" if conflicting_changes else "競合変更なし。",
+            f"競合変更: {len(conflicting_changes)}件検出。"
+            if conflicting_changes
+            else "競合変更なし。",
         ]
         return " ".join(parts)
 

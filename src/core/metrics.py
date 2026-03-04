@@ -1,7 +1,8 @@
 """アプリケーションメトリクス収集"""
+
+from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from collections import defaultdict
 
 from src.core.logging import get_logger
 
@@ -14,7 +15,9 @@ class MetricsCollector:
 
     # HTTPリクエストカウンター
     http_requests_total: dict[str, int] = field(default_factory=lambda: defaultdict(int))
-    http_request_duration_ms: dict[str, list[float]] = field(default_factory=lambda: defaultdict(list))
+    http_request_duration_ms: dict[str, list[float]] = field(
+        default_factory=lambda: defaultdict(list)
+    )
     http_errors_total: dict[str, int] = field(default_factory=lambda: defaultdict(int))
 
     # ビジネスメトリクス
@@ -62,7 +65,11 @@ class MetricsCollector:
         lines.append("# TYPE servicematrix_http_requests_total counter")
         for key, count in self.http_requests_total.items():
             method, path, status = key.rsplit(":", 2)
-            lines.append(f'servicematrix_http_requests_total{{method="{method}",path="{path}",status="{status}"}} {count}')
+            label = (
+                f'servicematrix_http_requests_total{{method="{method}",'
+                f'path="{path}",status="{status}"}}'
+            )
+            lines.append(f"{label} {count}")
 
         return "\n".join(lines)
 

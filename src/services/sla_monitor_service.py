@@ -224,9 +224,7 @@ class SLAMonitorService:
                 continue
 
             # 解決SLA経過率
-            resolution_progress = calculate_sla_progress(
-                created_at, incident.sla_resolution_due_at
-            )
+            resolution_progress = calculate_sla_progress(created_at, incident.sla_resolution_due_at)
             resolution_level = get_warning_level(resolution_progress)
 
             if resolution_level in (SLAWarningLevel.WARNING_70, SLAWarningLevel.WARNING_90):
@@ -252,9 +250,7 @@ class SLAMonitorService:
                 and incident.sla_response_due_at is not None
                 and incident.sla_response_due_at > now
             ):
-                response_progress = calculate_sla_progress(
-                    created_at, incident.sla_response_due_at
-                )
+                response_progress = calculate_sla_progress(created_at, incident.sla_response_due_at)
                 response_level = get_warning_level(response_progress)
 
                 if response_level in (SLAWarningLevel.WARNING_70, SLAWarningLevel.WARNING_90):
@@ -283,9 +279,7 @@ class SLAMonitorService:
             uid = uuid_mod.UUID(incident_id)
         except (ValueError, AttributeError):
             return None
-        result = await db.execute(
-            select(Incident).where(Incident.incident_id == uid)
-        )
+        result = await db.execute(select(Incident).where(Incident.incident_id == uid))
         incident = result.scalar_one_or_none()
         if incident is None:
             return None
@@ -394,24 +388,24 @@ class SLAMonitorService:
             if created_at is None:
                 continue
 
-            resolution_progress = calculate_sla_progress(
-                created_at, incident.sla_resolution_due_at
-            )
+            resolution_progress = calculate_sla_progress(created_at, incident.sla_resolution_due_at)
             resolution_level = get_warning_level(resolution_progress)
 
             if resolution_level in (SLAWarningLevel.WARNING_70, SLAWarningLevel.WARNING_90):
-                warnings.append({
-                    "incident_id": str(incident.incident_id),
-                    "incident_number": incident.incident_number,
-                    "title": incident.title,
-                    "priority": incident.priority,
-                    "sla_type": "resolution",
-                    "warning_level": resolution_level.value,
-                    "progress_percent": round(resolution_progress * 100, 1),
-                    "deadline": incident.sla_resolution_due_at.isoformat()
-                    if incident.sla_resolution_due_at
-                    else None,
-                })
+                warnings.append(
+                    {
+                        "incident_id": str(incident.incident_id),
+                        "incident_number": incident.incident_number,
+                        "title": incident.title,
+                        "priority": incident.priority,
+                        "sla_type": "resolution",
+                        "warning_level": resolution_level.value,
+                        "progress_percent": round(resolution_progress * 100, 1),
+                        "deadline": incident.sla_resolution_due_at.isoformat()
+                        if incident.sla_resolution_due_at
+                        else None,
+                    }
+                )
 
             # レスポンスSLA警告（未応答のみ）
             if (
@@ -419,24 +413,24 @@ class SLAMonitorService:
                 and incident.sla_response_due_at is not None
                 and incident.sla_response_due_at > now
             ):
-                response_progress = calculate_sla_progress(
-                    created_at, incident.sla_response_due_at
-                )
+                response_progress = calculate_sla_progress(created_at, incident.sla_response_due_at)
                 response_level = get_warning_level(response_progress)
 
                 if response_level in (SLAWarningLevel.WARNING_70, SLAWarningLevel.WARNING_90):
-                    warnings.append({
-                        "incident_id": str(incident.incident_id),
-                        "incident_number": incident.incident_number,
-                        "title": incident.title,
-                        "priority": incident.priority,
-                        "sla_type": "response",
-                        "warning_level": response_level.value,
-                        "progress_percent": round(response_progress * 100, 1),
-                        "deadline": incident.sla_response_due_at.isoformat()
-                        if incident.sla_response_due_at
-                        else None,
-                    })
+                    warnings.append(
+                        {
+                            "incident_id": str(incident.incident_id),
+                            "incident_number": incident.incident_number,
+                            "title": incident.title,
+                            "priority": incident.priority,
+                            "sla_type": "response",
+                            "warning_level": response_level.value,
+                            "progress_percent": round(response_progress * 100, 1),
+                            "deadline": incident.sla_response_due_at.isoformat()
+                            if incident.sla_response_due_at
+                            else None,
+                        }
+                    )
 
         return warnings
 

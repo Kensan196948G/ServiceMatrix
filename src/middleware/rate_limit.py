@@ -1,4 +1,5 @@
 """シンプルなインメモリレート制限"""
+
 import time
 from collections import defaultdict
 

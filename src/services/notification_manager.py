@@ -1,6 +1,5 @@
 """WebSocket接続管理・ブロードキャスト"""
 
-import asyncio
 import json
 from typing import Any
 

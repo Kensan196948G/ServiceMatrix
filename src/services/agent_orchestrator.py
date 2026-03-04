@@ -6,8 +6,8 @@ from enum import StrEnum
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.logging import get_logger
-from src.services.auto_repair_service import auto_repair_service
 from src.services.ai_triage_service import ai_triage_service
+from src.services.auto_repair_service import auto_repair_service
 
 logger = get_logger(__name__)
 
@@ -17,9 +17,9 @@ _MODERATE_KEYWORDS = ["error", "failed", "timeout", "performance", "エラー", 
 
 
 class TaskComplexity(StrEnum):
-    SIMPLE = "simple"      # キーワードトリアージのみ
+    SIMPLE = "simple"  # キーワードトリアージのみ
     MODERATE = "moderate"  # トリアージ + 修復候補
-    COMPLEX = "complex"    # トリアージ + 修復候補 + 自動実行候補抽出
+    COMPLEX = "complex"  # トリアージ + 修復候補 + 自動実行候補抽出
 
 
 @dataclass
@@ -29,7 +29,11 @@ class AgentTeamResult:
     agents_used: list[str]
     results: dict
     total_confidence: float
-    executed_at: str = field(default_factory=lambda: __import__('datetime').datetime.now(__import__('datetime').timezone.utc).isoformat())
+    executed_at: str = field(
+        default_factory=lambda: (
+            __import__("datetime").datetime.now(__import__("datetime").timezone.utc).isoformat()
+        )
+    )
 
 
 class AgentOrchestrator:

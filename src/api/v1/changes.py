@@ -1,7 +1,7 @@
 """変更管理API - CRUD + リスク評価 + CAB承認"""
 
 import uuid
-from datetime import date
+from datetime import UTC, date
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -84,7 +84,11 @@ async def create_change(
     change_data["requested_by"] = current_user.user_id
     change = await change_service.create_change(db, change_data)
     await ws_manager.broadcast(
-        {"type": "change_created", "change_id": str(change.change_id), "change_number": change.change_number},
+        {
+            "type": "change_created",
+            "change_id": str(change.change_id),
+            "change_number": change.change_number,
+        },
         channel="changes",
     )
     return change
@@ -102,10 +106,10 @@ async def get_change_calendar(
     end_date: date = Query(..., description="終了日 YYYY-MM-DD"),
 ):
     """指定期間の変更カレンダー（スケジュール済み変更一覧）"""
-    from datetime import datetime, timezone
+    from datetime import datetime
 
-    start_dt = datetime(start_date.year, start_date.month, start_date.day, tzinfo=timezone.utc)
-    end_dt = datetime(end_date.year, end_date.month, end_date.day, 23, 59, 59, tzinfo=timezone.utc)
+    start_dt = datetime(start_date.year, start_date.month, start_date.day, tzinfo=UTC)
+    end_dt = datetime(end_date.year, end_date.month, end_date.day, 23, 59, 59, tzinfo=UTC)
 
     query = (
         select(Change)
@@ -124,16 +128,20 @@ async def get_change_calendar(
         day = change.scheduled_start_at.date().isoformat()
         if day not in grouped:
             grouped[day] = []
-        grouped[day].append({
-            "change_id": str(change.change_id),
-            "change_number": change.change_number,
-            "title": change.title,
-            "status": change.status,
-            "change_type": change.change_type,
-            "risk_level": change.risk_level,
-            "scheduled_start_at": change.scheduled_start_at.isoformat(),
-            "scheduled_end_at": change.scheduled_end_at.isoformat() if change.scheduled_end_at else None,
-        })
+        grouped[day].append(
+            {
+                "change_id": str(change.change_id),
+                "change_number": change.change_number,
+                "title": change.title,
+                "status": change.status,
+                "change_type": change.change_type,
+                "risk_level": change.risk_level,
+                "scheduled_start_at": change.scheduled_start_at.isoformat(),
+                "scheduled_end_at": change.scheduled_end_at.isoformat()
+                if change.scheduled_end_at
+                else None,
+            }
+        )
 
     events = [{"date": day, "changes": items} for day, items in sorted(grouped.items())]
 
@@ -222,7 +230,12 @@ async def transition_change_status(
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e)) from e
     await ws_manager.broadcast(
-        {"type": "change_update", "action": "transition", "change_id": str(change.change_id), "new_status": change.status},
+        {
+            "type": "change_update",
+            "action": "transition",
+            "change_id": str(change.change_id),
+            "new_status": change.status,
+        },
         channel="changes",
     )
     return change
@@ -255,7 +268,13 @@ async def cab_approval(
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e)) from e
     await ws_manager.broadcast(
-        {"type": "change_update", "action": "cab_decision", "change_id": str(change.change_id), "approved": approval.approved, "new_status": change.status},
+        {
+            "type": "change_update",
+            "action": "cab_decision",
+            "change_id": str(change.change_id),
+            "approved": approval.approved,
+            "new_status": change.status,
+        },
         channel="changes",
     )
     return change
