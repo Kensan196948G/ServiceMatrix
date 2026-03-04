@@ -1,13 +1,17 @@
 """ServiceMatrix FastAPI アプリケーション"""
 
+import time
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
+from starlette.responses import Response
 
 from src.api.v1.router import api_router
 from src.core.config import settings
 from src.core.logging import setup_logging
+from src.core.metrics import api_request_duration_seconds
 from src.middleware.audit import AuditMiddleware
 from src.services.sla_monitor_service import sla_monitor
 
@@ -42,6 +46,25 @@ def create_app() -> FastAPI:
             {"name": "health", "description": "ヘルスチェック"},
         ],
     )
+
+    @app.get("/metrics", include_in_schema=False)
+    async def metrics():
+        return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
+
+    @app.middleware("http")
+    async def metrics_middleware(request: Request, call_next):
+        start = time.time()
+        response = await call_next(request)
+        duration = time.time() - start
+
+        if request.url.path != "/metrics":
+            api_request_duration_seconds.labels(
+                method=request.method,
+                endpoint=request.url.path,
+                status_code=str(response.status_code),
+            ).observe(duration)
+
+        return response
 
     app.add_middleware(
         CORSMiddleware,
