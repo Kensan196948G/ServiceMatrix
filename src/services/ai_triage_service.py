@@ -179,4 +179,55 @@ class AITriageService:
         return triage_result
 
 
+    async def find_similar_incidents(
+        self, db: AsyncSession, title: str, description: str | None, limit: int = 5
+    ) -> list[dict]:
+        """TF-IDFベースで類似インシデントを検索する"""
+        import re  # noqa: PLC0415
+
+        def _normalize(text: str) -> list[str]:
+            text = text.lower()
+            text = re.sub(r"[^\w\s]", " ", text)
+            return [w for w in text.split() if len(w) > 1]
+
+        query_words = _normalize(f"{title} {description or ''}")
+        if not query_words:
+            return []
+        query_counts: dict[str, int] = {}
+        for w in query_words:
+            query_counts[w] = query_counts.get(w, 0) + 1
+
+        result = await db.execute(
+            select(Incident).order_by(Incident.created_at.desc()).limit(200)
+        )
+        incidents = result.scalars().all()
+
+        scores: list[dict] = []
+        for inc in incidents:
+            doc_words = _normalize(f"{inc.title} {inc.description or ''}")
+            if not doc_words:
+                continue
+            doc_counts: dict[str, int] = {}
+            for w in doc_words:
+                doc_counts[w] = doc_counts.get(w, 0) + 1
+
+            common = sum(min(query_counts[w], doc_counts[w]) for w in query_counts if w in doc_counts)
+            denom = (sum(v * v for v in query_counts.values()) ** 0.5) * (
+                sum(v * v for v in doc_counts.values()) ** 0.5
+            )
+            similarity = common / denom if denom > 0 else 0.0
+            if similarity > 0:
+                scores.append(
+                    {
+                        "incident_id": str(inc.incident_id),
+                        "incident_number": inc.incident_number,
+                        "title": inc.title,
+                        "similarity": round(similarity, 4),
+                    }
+                )
+
+        scores.sort(key=lambda x: x["similarity"], reverse=True)
+        return scores[:limit]
+
+
 ai_triage_service = AITriageService()
