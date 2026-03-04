@@ -37,6 +37,11 @@ class ScheduleRequest(BaseModel):
     scheduled_end_at: datetime | None = None
 
 
+class RescheduleRequest(BaseModel):
+    scheduled_start: datetime
+    scheduled_end: datetime | None = None
+
+
 class ChangeStatusTransition(BaseModel):
     new_status: str
     notes: str | None = None

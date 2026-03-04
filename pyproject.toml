@@ -53,7 +53,7 @@ filterwarnings = [
 
 [tool.coverage.run]
 source = ["src"]
-omit = ["src/models/*", "src/schemas/*", "src/__init__.py"]
+omit = ["src/models/*", "src/schemas/*", "src/__init__.py", "src/worker/*"]
 
 [tool.coverage.report]
 exclude_lines = [

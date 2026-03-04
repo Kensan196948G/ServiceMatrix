@@ -7,6 +7,7 @@ from src.api.v1.audit import router as audit_router
 from src.api.v1.auth import router as auth_router
 from src.api.v1.changes import router as changes_router
 from src.api.v1.cmdb import router as cmdb_router
+from src.api.v1.dashboard import router as dashboard_router
 from src.api.v1.health import router as health_router
 from src.api.v1.incidents import router as incidents_router
 from src.api.v1.notifications import router as notifications_router
@@ -30,3 +31,4 @@ api_router.include_router(audit_router)
 api_router.include_router(ai_router)
 api_router.include_router(websocket_router)
 api_router.include_router(notifications_router)
+api_router.include_router(dashboard_router)

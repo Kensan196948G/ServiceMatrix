@@ -90,8 +90,12 @@ class Incident(Base, TimestampMixin):
     category: Mapped[str | None] = mapped_column(String(100))
     subcategory: Mapped[str | None] = mapped_column(String(100))
     affected_service: Mapped[str | None] = mapped_column(String(200))
+    department: Mapped[str | None] = mapped_column(String(100), nullable=True)
     resolution_notes: Mapped[str | None] = mapped_column(Text)
     ai_triage_notes: Mapped[str | None] = mapped_column(Text)
+    linked_problem_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("problems.problem_id"), nullable=True
+    )
 
     # リレーション
     assignee: Mapped["User | None"] = relationship(  # noqa: F821

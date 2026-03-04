@@ -30,6 +30,7 @@ class IncidentCreate(BaseModel):
     subcategory: str | None = Field(None, examples=["Database"])
     affected_service: str | None = Field(None, examples=["OrderService"])
     reported_by: uuid.UUID | None = Field(None, examples=["123e4567-e89b-12d3-a456-426614174000"])
+    department: str | None = Field(None, examples=["IT"])
 
 
 class IncidentUpdate(BaseModel):
@@ -41,6 +42,7 @@ class IncidentUpdate(BaseModel):
     assigned_to: uuid.UUID | None = None
     assigned_team_id: uuid.UUID | None = None
     resolution_notes: str | None = None
+    department: str | None = None
 
 
 class IncidentBulkAssign(BaseModel):

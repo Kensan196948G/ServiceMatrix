@@ -14,6 +14,7 @@ class CICreate(BaseModel):
     owner_id: uuid.UUID | None = None
     description: str | None = None
     attributes: dict | None = None
+    department: str | None = None
 
 
 class CIUpdate(BaseModel):
@@ -24,6 +25,7 @@ class CIUpdate(BaseModel):
     version: str | None = None
     description: str | None = None
     attributes: dict | None = None
+    department: str | None = None
 
     @field_validator("status")
     @classmethod

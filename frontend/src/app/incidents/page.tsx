@@ -42,12 +42,23 @@ const PRIORITY_OPTIONS = [
   { value: "P4", label: "P4 - 低" },
 ];
 
+const DEPARTMENT_OPTIONS = [
+  { value: "", label: "すべての部署" },
+  { value: "IT", label: "IT" },
+  { value: "HR", label: "HR" },
+  { value: "Finance", label: "Finance" },
+  { value: "Operations", label: "Operations" },
+  { value: "Development", label: "Development" },
+  { value: "Management", label: "Management" },
+];
+
 interface CreateIncidentForm {
   title: string;
   description: string;
   priority: string;
   category: string;
   affected_service: string;
+  department: string;
 }
 
 export default function IncidentsPage() {
@@ -55,9 +66,10 @@ export default function IncidentsPage() {
   const [page, setPage] = useState(1);
   const [filterStatus, setFilterStatus] = useState("");
   const [filterPriority, setFilterPriority] = useState("");
+  const [filterDepartment, setFilterDepartment] = useState("");
   const [showCreate, setShowCreate] = useState(false);
   const [form, setForm] = useState<CreateIncidentForm>({
-    title: "", description: "", priority: "P3", category: "", affected_service: "",
+    title: "", description: "", priority: "P3", category: "", affected_service: "", department: "",
   });
   const [formError, setFormError] = useState("");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -65,13 +77,14 @@ export default function IncidentsPage() {
   const [bulkAssignee, setBulkAssignee] = useState("");
   const [bulkPriority, setBulkPriority] = useState("");
 
-  const queryKey = ["incidents", page, filterStatus, filterPriority];
+  const queryKey = ["incidents", page, filterStatus, filterPriority, filterDepartment];
   const { data, isLoading, error, refetch } = useQuery({
     queryKey,
     queryFn: () => {
       const params: Record<string, string | number> = { page, size: PAGE_SIZE };
       if (filterStatus) params.status = filterStatus;
       if (filterPriority) params.priority = filterPriority;
+      if (filterDepartment) params.department = filterDepartment;
       return apiClient.get<PaginatedResponse<IncidentResponse>>("/incidents", { params }).then(r => r.data);
     },
     retry: 1,
@@ -88,7 +101,7 @@ export default function IncidentsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["incidents"] });
       setShowCreate(false);
-      setForm({ title: "", description: "", priority: "P3", category: "", affected_service: "" });
+      setForm({ title: "", description: "", priority: "P3", category: "", affected_service: "", department: "" });
       setFormError("");
     },
     onError: (e: unknown) => {
@@ -168,6 +181,7 @@ export default function IncidentsPage() {
       priority: form.priority,
       ...(form.category && { category: form.category }),
       ...(form.affected_service && { affected_service: form.affected_service }),
+      ...(form.department && { department: form.department }),
     });
   };
 
@@ -216,9 +230,16 @@ export default function IncidentsPage() {
             onChange={e => { setFilterPriority(e.target.value); setPage(1); }}
           />
         </div>
-        {(filterStatus || filterPriority) && (
+        <div className="w-44">
+          <Select
+            options={DEPARTMENT_OPTIONS}
+            value={filterDepartment}
+            onChange={e => { setFilterDepartment(e.target.value); setPage(1); }}
+          />
+        </div>
+        {(filterStatus || filterPriority || filterDepartment) && (
           <button
-            onClick={() => { setFilterStatus(""); setFilterPriority(""); setPage(1); }}
+            onClick={() => { setFilterStatus(""); setFilterPriority(""); setFilterDepartment(""); setPage(1); }}
             className="text-xs text-blue-600 hover:text-blue-700 font-medium"
           >
             フィルタをリセット
@@ -467,6 +488,20 @@ export default function IncidentsPage() {
               placeholder="例: 受発注システム, メールサービス"
               className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
             />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">部署</label>
+            <select
+              value={form.department}
+              onChange={e => setForm(f => ({ ...f, department: e.target.value }))}
+              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            >
+              <option value="">部署を選択（任意）</option>
+              {DEPARTMENT_OPTIONS.filter(o => o.value).map(o => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
+            </select>
           </div>
 
           <div className="flex justify-end gap-3 pt-2">

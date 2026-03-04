@@ -72,6 +72,48 @@ async def get_sla_status(
     return status
 
 
+@router.get("/alerts")
+async def get_sla_alerts(
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> list[dict]:
+    """SLA残時間30%以下のインシデント一覧（エスカレーション対象）"""
+    now = datetime.now(UTC)
+    result = await db.execute(
+        select(Incident).where(
+            Incident.sla_breached == False,  # noqa: E712
+            Incident.sla_resolution_due_at.isnot(None),
+            Incident.status.notin_(["Resolved", "Closed"]),
+        )
+    )
+    incidents = result.scalars().all()
+
+    alerts: list[dict] = []
+    for incident in incidents:
+        due = incident.sla_resolution_due_at
+        created = incident.created_at
+        if due is None:
+            continue
+        if due.tzinfo is None:
+            due = due.replace(tzinfo=UTC)
+        if created.tzinfo is None:
+            created = created.replace(tzinfo=UTC)
+        total = (due - created).total_seconds()
+        if total <= 0:
+            continue
+        remaining = (due - now).total_seconds()
+        remaining_pct = (remaining / total) * 100
+        if remaining_pct <= 30:
+            alerts.append(
+                {
+                    "incident_id": str(incident.incident_id),
+                    "title": incident.title,
+                    "sla_remaining_percent": round(remaining_pct, 2),
+                    "priority": incident.priority,
+                }
+            )
+    return alerts
+
+
 @router.post("/check")
 async def manual_sla_check(
     db: Annotated[AsyncSession, Depends(get_db)],
