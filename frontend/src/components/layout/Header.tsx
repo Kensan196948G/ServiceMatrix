@@ -5,7 +5,7 @@
 "use client";
 
 import { useState } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { Bell, Search, LogOut, User, Settings, ChevronDown } from "lucide-react";
 import { useAuthStore } from "@/hooks/useAuth";
 
@@ -26,10 +26,13 @@ const pageTitles: Record<string, string> = {
   "/settings/data": "データ管理",
   "/settings/appearance": "外観設定",
   "/settings/general": "システム全般",
+  "/profile": "プロフィール",
+  "/profile/settings": "個人設定",
 };
 
 export default function Header() {
   const pathname = usePathname();
+  const router = useRouter();
   const { user, logout } = useAuthStore();
   const [menuOpen, setMenuOpen] = useState(false);
   const [searchFocused, setSearchFocused] = useState(false);
@@ -100,12 +103,18 @@ export default function Header() {
                 </div>
                 <ul className="p-1">
                   <li>
-                    <button className="flex w-full items-center gap-2 rounded px-3 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                    <button
+                      onClick={() => { router.push("/profile"); setMenuOpen(false); }}
+                      className="flex w-full items-center gap-2 rounded px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                    >
                       <User className="h-4 w-4 text-gray-400" /> プロフィール
                     </button>
                   </li>
                   <li>
-                    <button className="flex w-full items-center gap-2 rounded px-3 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                    <button
+                      onClick={() => { router.push("/profile/settings"); setMenuOpen(false); }}
+                      className="flex w-full items-center gap-2 rounded px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                    >
                       <Settings className="h-4 w-4 text-gray-400" /> 設定
                     </button>
                   </li>
