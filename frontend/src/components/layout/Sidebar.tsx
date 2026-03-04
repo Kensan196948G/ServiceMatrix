@@ -1,5 +1,5 @@
 /**
- * Sidebar コンポーネント - Jira風ダークサイドバー
+ * Sidebar コンポーネント - ライトテーマサイドバー
  */
 "use client";
 
@@ -15,6 +15,9 @@ import {
   Brain,
   Database,
   ScrollText,
+  Settings,
+  Users,
+  Bell,
   ChevronRight,
   type LucideIcon,
 } from "lucide-react";
@@ -28,7 +31,6 @@ interface NavItem {
   label: string;
   href: string;
   icon: LucideIcon;
-  badge?: string;
 }
 
 const navGroups: NavGroup[] = [
@@ -55,21 +57,29 @@ const navGroups: NavGroup[] = [
       { label: "監査ログ", href: "/audit-logs", icon: ScrollText },
     ],
   },
+  {
+    label: "システム設定",
+    items: [
+      { label: "ユーザー管理", href: "/settings/users", icon: Users },
+      { label: "通知設定", href: "/settings/notifications", icon: Bell },
+      { label: "システム設定", href: "/settings", icon: Settings },
+    ],
+  },
 ];
 
 export default function Sidebar() {
   const pathname = usePathname();
 
   return (
-    <aside className="flex h-full w-60 flex-col bg-[#1e2433] text-gray-100 flex-shrink-0">
+    <aside className="flex h-full w-60 flex-col bg-white border-r border-gray-200 flex-shrink-0">
       {/* ロゴ */}
-      <div className="flex h-14 items-center px-4 border-b border-white/10">
+      <div className="flex h-14 items-center px-4 border-b border-gray-200">
         <Link href="/" className="flex items-center gap-2.5">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-500 font-bold text-white text-sm">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600 font-bold text-white text-sm">
             SM
           </div>
           <div>
-            <div className="text-sm font-bold text-white leading-tight">ServiceMatrix</div>
+            <div className="text-sm font-bold text-gray-900 leading-tight">ServiceMatrix</div>
             <div className="text-[10px] text-gray-400 leading-tight">ITSM Governance</div>
           </div>
         </Link>
@@ -80,7 +90,7 @@ export default function Sidebar() {
         {navGroups.map((group, gi) => (
           <div key={gi} className={gi > 0 ? "mt-4" : ""}>
             {group.label && (
-              <p className="mb-1 px-3 text-[10px] font-semibold uppercase tracking-wider text-gray-500">
+              <p className="mb-1 px-3 text-[10px] font-semibold uppercase tracking-wider text-gray-400">
                 {group.label}
               </p>
             )}
@@ -96,15 +106,15 @@ export default function Sidebar() {
                       href={item.href}
                       className={`flex items-center justify-between rounded-md px-3 py-2 text-sm transition-colors group ${
                         isActive
-                          ? "bg-blue-600 text-white"
-                          : "text-gray-300 hover:bg-white/10 hover:text-white"
+                          ? "bg-blue-50 text-blue-700 font-medium"
+                          : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
                       }`}
                     >
                       <span className="flex items-center gap-2.5">
-                        <item.icon className={`h-4 w-4 flex-shrink-0 ${isActive ? "text-white" : "text-gray-400 group-hover:text-white"}`} />
+                        <item.icon className={`h-4 w-4 flex-shrink-0 ${isActive ? "text-blue-600" : "text-gray-400 group-hover:text-gray-600"}`} />
                         <span className="truncate">{item.label}</span>
                       </span>
-                      {isActive && <ChevronRight className="h-3.5 w-3.5 text-white/60" />}
+                      {isActive && <ChevronRight className="h-3.5 w-3.5 text-blue-400" />}
                     </Link>
                   </li>
                 );
@@ -115,8 +125,8 @@ export default function Sidebar() {
       </nav>
 
       {/* フッター */}
-      <div className="border-t border-white/10 px-4 py-3">
-        <p className="text-[10px] text-gray-500">v1.0.0 · ITIL 4 準拠</p>
+      <div className="border-t border-gray-200 px-4 py-3">
+        <p className="text-[10px] text-gray-400">v1.0.0 · ITIL 4 準拠</p>
       </div>
     </aside>
   );
