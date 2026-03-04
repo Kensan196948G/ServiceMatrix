@@ -1,12 +1,13 @@
 /**
  * ルートレイアウト
- * アプリ全体の共通構造（Sidebar + Header + メインコンテンツ）
+ * アプリ全体の共通構造（AuthProvider + QueryProvider + AppShell）
  */
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import AppShell from "./AppShell";
 import QueryProvider from "@/providers/QueryProvider";
+import { AuthProvider } from "@/contexts/AuthContext";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -25,7 +26,9 @@ export default function RootLayout({
     <html lang="ja">
       <body className={inter.className}>
         <QueryProvider>
-          <AppShell>{children}</AppShell>
+          <AuthProvider>
+            <AppShell>{children}</AppShell>
+          </AuthProvider>
         </QueryProvider>
       </body>
     </html>

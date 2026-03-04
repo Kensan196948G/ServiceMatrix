@@ -1,12 +1,14 @@
 /**
  * 認証状態管理フック（Zustand）
  * ログイン・ログアウト・ユーザー情報をグローバルに管理
+ * JWT有効期限検証付き
  */
 "use client";
 
 import { create } from "zustand";
 import type { UserResponse, LoginRequest } from "@/types/api";
 import { login as apiLogin, logout as apiLogout, getCurrentUser } from "@/lib/auth";
+import { authStorage } from "@/lib/token";
 
 /** 認証ストアの型定義 */
 interface AuthState {
@@ -68,8 +70,9 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   initialize: async () => {
     if (typeof window === "undefined") return;
-    const token = localStorage.getItem("access_token");
-    if (!token) {
+    const token = authStorage.getToken();
+    if (!token || authStorage.isTokenExpired(token)) {
+      authStorage.removeToken();
       set({ isAuthenticated: false, user: null });
       return;
     }
@@ -78,8 +81,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       const user = await getCurrentUser();
       set({ user, isAuthenticated: true, isLoading: false });
     } catch {
-      localStorage.removeItem("access_token");
-      localStorage.removeItem("refresh_token");
+      authStorage.removeToken();
       set({ user: null, isAuthenticated: false, isLoading: false });
     }
   },

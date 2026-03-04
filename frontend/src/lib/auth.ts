@@ -1,9 +1,12 @@
 /**
  * 認証ユーティリティ
- * ログイン・ログアウト・トークン管理
+ * ログイン・ログアウト・トークン管理・JWT有効期限検証
  */
 import apiClient from "./api";
+import { authStorage } from "./token";
 import type { LoginRequest, TokenResponse, UserResponse } from "@/types/api";
+
+export { authStorage } from "./token";
 
 /**
  * ログイン処理
@@ -19,8 +22,10 @@ export async function login(
   const data = response.data;
 
   if (typeof window !== "undefined") {
-    localStorage.setItem("access_token", data.access_token);
-    localStorage.setItem("refresh_token", data.refresh_token);
+    authStorage.setToken(data.access_token);
+    if (data.refresh_token) {
+      authStorage.setRefreshToken(data.refresh_token);
+    }
   }
 
   return data;
@@ -32,8 +37,7 @@ export async function login(
  */
 export function logout(): void {
   if (typeof window !== "undefined") {
-    localStorage.removeItem("access_token");
-    localStorage.removeItem("refresh_token");
+    authStorage.removeToken();
     window.location.href = "/login";
   }
 }
@@ -47,11 +51,13 @@ export async function getCurrentUser(): Promise<UserResponse> {
 }
 
 /**
- * 認証済みかどうかを判定
+ * 認証済みかどうかを判定（トークン有効期限も検証）
  */
 export function isAuthenticated(): boolean {
   if (typeof window === "undefined") return false;
-  return !!localStorage.getItem("access_token");
+  const token = authStorage.getToken();
+  if (!token) return false;
+  return !authStorage.isTokenExpired(token);
 }
 
 /**
@@ -59,5 +65,5 @@ export function isAuthenticated(): boolean {
  */
 export function getAccessToken(): string | null {
   if (typeof window === "undefined") return null;
-  return localStorage.getItem("access_token");
+  return authStorage.getToken();
 }
