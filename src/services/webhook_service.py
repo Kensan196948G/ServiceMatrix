@@ -59,9 +59,12 @@ async def process_issues_event(db: AsyncSession, payload: dict) -> dict | None:
         logger.info(
             "github_issue_incident_created",
             issue_number=issue_number,
-            incident_id=str(incident.id),
+            incident_id=str(incident.incident_id),
         )
-        return {"incident_id": str(incident.id), "incident_number": incident.incident_number}
+        return {
+            "incident_id": str(incident.incident_id),
+            "incident_number": incident.incident_number,
+        }
 
     if action == "closed":
         return {"action": "issue_closed", "issue_number": issue_number}

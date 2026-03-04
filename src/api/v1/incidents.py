@@ -51,7 +51,7 @@ async def list_incidents(
 
     query = query.offset((page - 1) * size).limit(size).order_by(Incident.created_at.desc())
     result = await db.execute(query)
-    items = result.scalars().all()
+    items = list(result.scalars().all())
 
     return PaginatedResponse(
         items=items,

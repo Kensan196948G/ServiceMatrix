@@ -73,7 +73,7 @@ async def test_process_issues_opened():
     }
 
     mock_incident = MagicMock()
-    mock_incident.id = "abc-123"
+    mock_incident.incident_id = "abc-123"
     mock_incident.incident_number = "INC-0001"
 
     mock_db = AsyncMock()
@@ -99,7 +99,7 @@ async def test_process_issues_opened_priority_default():
     }
 
     mock_incident = MagicMock()
-    mock_incident.id = "def-456"
+    mock_incident.incident_id = "def-456"
     mock_incident.incident_number = "INC-0002"
     mock_db = AsyncMock()
 
@@ -246,7 +246,7 @@ async def test_webhook_api_issues_opened(client):
         },
     }
     mock_incident = MagicMock()
-    mock_incident.id = "webhook-inc-id"
+    mock_incident.incident_id = "webhook-inc-id"
     mock_incident.incident_number = "INC-W001"
 
     with patch(

@@ -11,6 +11,7 @@ import asyncio
 import uuid as uuid_mod
 from datetime import UTC, datetime
 from enum import StrEnum
+from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -76,7 +77,7 @@ class SLAMonitorService:
     def __init__(self) -> None:
         self.running = False
         self._task: asyncio.Task | None = None
-        self._scheduler = None
+        self._scheduler: Any = None
 
     async def start(self) -> None:
         """APSchedulerを起動しSLA監視ジョブを登録"""
