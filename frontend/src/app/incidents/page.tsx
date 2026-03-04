@@ -1,138 +1,326 @@
 /**
- * インシデント一覧ページ
- * バックエンドAPIからインシデントを取得してテーブル表示（ページネーション対応）
+ * インシデント管理ページ - Jira風リスト表示
+ * フィルタ・ソート・ページネーション・新規作成モーダル
  */
 "use client";
 
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Plus, Filter, RefreshCw, AlertTriangle, Clock, CheckCircle2, XCircle } from "lucide-react";
 import apiClient from "@/lib/api";
-import Table from "@/components/ui/Table";
 import Badge, { getPriorityVariant, getStatusVariant } from "@/components/ui/Badge";
 import LoadingSpinner from "@/components/ui/LoadingSpinner";
+import Button from "@/components/ui/Button";
+import Modal from "@/components/ui/Modal";
+import Select from "@/components/ui/Select";
 import type { IncidentResponse, PaginatedResponse } from "@/types/api";
 
 const PAGE_SIZE = 20;
 
-export default function IncidentsPage() {
-  const [skip, setSkip] = useState(0);
+const PRIORITY_LABELS: Record<string, string> = {
+  P1: "P1 - 緊急",
+  P2: "P2 - 高",
+  P3: "P3 - 中",
+  P4: "P4 - 低",
+};
 
-  const { data, isLoading, error } = useQuery({
-    queryKey: ["incidents", skip],
-    queryFn: () =>
-      apiClient
-        .get<PaginatedResponse<IncidentResponse> | IncidentResponse[]>(
-          "/incidents",
-          { params: { skip, limit: PAGE_SIZE } }
-        )
-        .then((r) => r.data),
+const STATUS_OPTIONS = [
+  { value: "", label: "すべてのステータス" },
+  { value: "New", label: "New" },
+  { value: "Acknowledged", label: "Acknowledged" },
+  { value: "In_Progress", label: "In Progress" },
+  { value: "Resolved", label: "Resolved" },
+  { value: "Closed", label: "Closed" },
+];
+
+const PRIORITY_OPTIONS = [
+  { value: "", label: "すべての優先度" },
+  { value: "P1", label: "P1 - 緊急" },
+  { value: "P2", label: "P2 - 高" },
+  { value: "P3", label: "P3 - 中" },
+  { value: "P4", label: "P4 - 低" },
+];
+
+interface CreateIncidentForm {
+  title: string;
+  description: string;
+  priority: string;
+  category: string;
+  affected_service: string;
+}
+
+export default function IncidentsPage() {
+  const queryClient = useQueryClient();
+  const [page, setPage] = useState(1);
+  const [filterStatus, setFilterStatus] = useState("");
+  const [filterPriority, setFilterPriority] = useState("");
+  const [showCreate, setShowCreate] = useState(false);
+  const [form, setForm] = useState<CreateIncidentForm>({
+    title: "", description: "", priority: "P3", category: "", affected_service: "",
+  });
+  const [formError, setFormError] = useState("");
+
+  const queryKey = ["incidents", page, filterStatus, filterPriority];
+  const { data, isLoading, error, refetch } = useQuery({
+    queryKey,
+    queryFn: () => {
+      const params: Record<string, string | number> = { page, size: PAGE_SIZE };
+      if (filterStatus) params.status = filterStatus;
+      if (filterPriority) params.priority = filterPriority;
+      return apiClient.get<PaginatedResponse<IncidentResponse>>("/incidents", { params }).then(r => r.data);
+    },
+    retry: 1,
   });
 
-  if (isLoading) {
-    return <LoadingSpinner size="lg" message="インシデントを読み込み中..." />;
-  }
+  const createMutation = useMutation({
+    mutationFn: (body: Record<string, string>) => apiClient.post("/incidents", body).then(r => r.data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["incidents"] });
+      setShowCreate(false);
+      setForm({ title: "", description: "", priority: "P3", category: "", affected_service: "" });
+      setFormError("");
+    },
+    onError: (e: unknown) => {
+      const msg = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail ?? "作成に失敗しました";
+      setFormError(typeof msg === "string" ? msg : JSON.stringify(msg));
+    },
+  });
 
-  if (error) {
-    return (
-      <div className="rounded-lg bg-red-50 p-4 text-sm text-red-700">
-        インシデントの取得に失敗しました。
-      </div>
-    );
-  }
-
-  // PaginatedResponse と配列レスポンス両方に対応
-  const isPaginated = data && !Array.isArray(data) && "items" in data;
-  const incidents: IncidentResponse[] = isPaginated
-    ? (data as PaginatedResponse<IncidentResponse>).items
-    : Array.isArray(data)
-      ? (data as IncidentResponse[])
-      : [];
-  const total = isPaginated
-    ? (data as PaginatedResponse<IncidentResponse>).total
-    : incidents.length;
-
+  const incidents: IncidentResponse[] = data?.items ?? [];
+  const total = data?.total ?? 0;
   const totalPages = Math.ceil(total / PAGE_SIZE);
-  const currentPage = Math.floor(skip / PAGE_SIZE) + 1;
-  const hasPrev = skip > 0;
-  const hasNext = skip + PAGE_SIZE < total;
+
+  const handleCreate = () => {
+    if (!form.title.trim()) { setFormError("タイトルは必須です"); return; }
+    createMutation.mutate({
+      title: form.title,
+      description: form.description,
+      priority: form.priority,
+      ...(form.category && { category: form.category }),
+      ...(form.affected_service && { affected_service: form.affected_service }),
+    });
+  };
+
+  const priorityBadgeStyle: Record<string, string> = {
+    P1: "bg-red-100 text-red-800 border border-red-200",
+    P2: "bg-orange-100 text-orange-800 border border-orange-200",
+    P3: "bg-yellow-100 text-yellow-800 border border-yellow-200",
+    P4: "bg-gray-100 text-gray-700 border border-gray-200",
+  };
 
   return (
-    <div>
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">インシデント管理</h1>
-        <span className="text-sm text-gray-500">{total} 件</span>
+    <div className="space-y-4">
+      {/* ページヘッダー */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+            <AlertTriangle className="h-5 w-5 text-red-500" />
+            インシデント管理
+          </h1>
+          <p className="text-sm text-gray-500 mt-0.5">全 {total} 件のインシデント</p>
+        </div>
+        <Button
+          variant="primary"
+          size="md"
+          icon={<Plus className="h-4 w-4" />}
+          onClick={() => setShowCreate(true)}
+        >
+          新規インシデント
+        </Button>
       </div>
 
-      <Table<IncidentResponse>
-        columns={[
-          { header: "番号", accessor: "incident_number", className: "w-40" },
-          { header: "タイトル", accessor: "title" },
-          {
-            header: "優先度",
-            accessor: (row) => (
-              <Badge variant={getPriorityVariant(row.priority)}>
-                {row.priority}
-              </Badge>
-            ),
-            className: "w-24",
-          },
-          {
-            header: "ステータス",
-            accessor: (row) => (
-              <Badge variant={getStatusVariant(row.status)}>{row.status}</Badge>
-            ),
-            className: "w-36",
-          },
-          {
-            header: "SLA",
-            accessor: (row) => (
-              <Badge variant={row.sla_breached ? "danger" : "success"}>
-                {row.sla_breached ? "超過" : "遵守"}
-              </Badge>
-            ),
-            className: "w-24",
-          },
-          {
-            header: "作成日時",
-            accessor: (row) =>
-              new Date(row.created_at).toLocaleDateString("ja-JP"),
-            className: "w-32",
-          },
-        ]}
-        data={incidents}
-        emptyMessage="インシデントはありません"
-      />
+      {/* フィルタバー */}
+      <div className="flex flex-wrap items-center gap-3 rounded-lg border border-gray-200 bg-white p-3 shadow-sm">
+        <Filter className="h-4 w-4 text-gray-400 flex-shrink-0" />
+        <div className="w-44">
+          <Select
+            options={STATUS_OPTIONS}
+            value={filterStatus}
+            onChange={e => { setFilterStatus(e.target.value); setPage(1); }}
+          />
+        </div>
+        <div className="w-44">
+          <Select
+            options={PRIORITY_OPTIONS}
+            value={filterPriority}
+            onChange={e => { setFilterPriority(e.target.value); setPage(1); }}
+          />
+        </div>
+        {(filterStatus || filterPriority) && (
+          <button
+            onClick={() => { setFilterStatus(""); setFilterPriority(""); setPage(1); }}
+            className="text-xs text-blue-600 hover:text-blue-700 font-medium"
+          >
+            フィルタをリセット
+          </button>
+        )}
+        <div className="ml-auto">
+          <Button variant="ghost" size="sm" icon={<RefreshCw className="h-3.5 w-3.5" />} onClick={() => refetch()}>
+            更新
+          </Button>
+        </div>
+      </div>
 
-      {/* ページネーションコントロール */}
+      {/* インシデントリスト */}
+      <div className="rounded-lg border border-gray-200 bg-white shadow-sm overflow-hidden">
+        {isLoading ? (
+          <div className="flex h-48 items-center justify-center">
+            <LoadingSpinner size="lg" message="インシデントを読み込み中..." />
+          </div>
+        ) : error ? (
+          <div className="flex h-48 items-center justify-center">
+            <div className="text-center text-sm text-red-600">
+              <XCircle className="mx-auto mb-2 h-8 w-8 text-red-400" />
+              インシデントの取得に失敗しました
+            </div>
+          </div>
+        ) : incidents.length === 0 ? (
+          <div className="flex h-48 flex-col items-center justify-center gap-2 text-gray-400">
+            <CheckCircle2 className="h-8 w-8 text-green-400" />
+            <p className="text-sm">インシデントはありません</p>
+          </div>
+        ) : (
+          <>
+            {/* テーブルヘッダー */}
+            <div className="grid grid-cols-[140px_1fr_90px_130px_90px_110px] gap-3 border-b border-gray-100 bg-gray-50 px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-gray-500">
+              <span>番号</span>
+              <span>タイトル</span>
+              <span>優先度</span>
+              <span>ステータス</span>
+              <span>SLA</span>
+              <span>作成日時</span>
+            </div>
+
+            {/* テーブル行 */}
+            {incidents.map((incident) => (
+              <div
+                key={incident.incident_id}
+                className="grid grid-cols-[140px_1fr_90px_130px_90px_110px] gap-3 items-center border-b border-gray-50 px-4 py-3 hover:bg-blue-50/40 transition-colors cursor-pointer last:border-0"
+              >
+                <span className="font-mono text-xs text-gray-500">{incident.incident_number}</span>
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium text-gray-800">{incident.title}</p>
+                  {incident.affected_service && (
+                    <p className="truncate text-xs text-gray-400">{incident.affected_service}</p>
+                  )}
+                </div>
+                <span>
+                  <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${priorityBadgeStyle[incident.priority] ?? "bg-gray-100 text-gray-600"}`}>
+                    {incident.priority}
+                  </span>
+                </span>
+                <span>
+                  <Badge variant={getStatusVariant(incident.status)}>
+                    {incident.status.replace(/_/g, " ")}
+                  </Badge>
+                </span>
+                <span>
+                  {incident.sla_breached ? (
+                    <span className="flex items-center gap-1 text-xs text-red-600 font-medium">
+                      <XCircle className="h-3.5 w-3.5" /> 超過
+                    </span>
+                  ) : (
+                    <span className="flex items-center gap-1 text-xs text-green-600">
+                      <Clock className="h-3.5 w-3.5" /> 遵守
+                    </span>
+                  )}
+                </span>
+                <span className="text-xs text-gray-400">
+                  {new Date(incident.created_at).toLocaleDateString("ja-JP", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+                </span>
+              </div>
+            ))}
+          </>
+        )}
+      </div>
+
+      {/* ページネーション */}
       {totalPages > 1 && (
-        <div className="mt-4 flex items-center justify-between">
+        <div className="flex items-center justify-between">
           <p className="text-sm text-gray-500">
-            {skip + 1}〜{Math.min(skip + PAGE_SIZE, total)} 件 / 全 {total} 件
+            {(page - 1) * PAGE_SIZE + 1}〜{Math.min(page * PAGE_SIZE, total)} 件 / 全 {total} 件
           </p>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setSkip(Math.max(0, skip - PAGE_SIZE))}
-              disabled={!hasPrev}
-              className="flex items-center gap-1 rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              <ChevronLeft className="h-4 w-4" />
-              前へ
-            </button>
-            <span className="text-sm text-gray-600">
-              {currentPage} / {totalPages}
-            </span>
-            <button
-              onClick={() => setSkip(skip + PAGE_SIZE)}
-              disabled={!hasNext}
-              className="flex items-center gap-1 rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              次へ
-              <ChevronRight className="h-4 w-4" />
-            </button>
+          <div className="flex items-center gap-1">
+            <Button variant="secondary" size="sm" disabled={page === 1} onClick={() => setPage(p => p - 1)}>前へ</Button>
+            <span className="px-3 text-sm text-gray-600">{page} / {totalPages}</span>
+            <Button variant="secondary" size="sm" disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}>次へ</Button>
           </div>
         </div>
       )}
+
+      {/* 新規作成モーダル */}
+      <Modal isOpen={showCreate} onClose={() => { setShowCreate(false); setFormError(""); }} title="新規インシデント作成" size="lg">
+        <div className="space-y-4">
+          {formError && (
+            <div className="rounded-md bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">{formError}</div>
+          )}
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">タイトル <span className="text-red-500">*</span></label>
+            <input
+              type="text"
+              value={form.title}
+              onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
+              placeholder="インシデントの概要を入力"
+              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">説明</label>
+            <textarea
+              value={form.description}
+              onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
+              placeholder="詳細な説明を入力"
+              rows={3}
+              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 resize-none"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">優先度</label>
+              <select
+                value={form.priority}
+                onChange={e => setForm(f => ({ ...f, priority: e.target.value }))}
+                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              >
+                {Object.entries(PRIORITY_LABELS).map(([v, l]) => (
+                  <option key={v} value={v}>{l}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">カテゴリ</label>
+              <input
+                type="text"
+                value={form.category}
+                onChange={e => setForm(f => ({ ...f, category: e.target.value }))}
+                placeholder="例: Network, Server, Application"
+                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">影響サービス</label>
+            <input
+              type="text"
+              value={form.affected_service}
+              onChange={e => setForm(f => ({ ...f, affected_service: e.target.value }))}
+              placeholder="例: 受発注システム, メールサービス"
+              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            />
+          </div>
+
+          <div className="flex justify-end gap-3 pt-2">
+            <Button variant="secondary" onClick={() => { setShowCreate(false); setFormError(""); }}>キャンセル</Button>
+            <Button variant="primary" loading={createMutation.isPending} onClick={handleCreate}>
+              インシデントを作成
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

@@ -1,6 +1,5 @@
 /**
- * サイドバーナビゲーションコンポーネント
- * ITSMモジュールへのナビゲーションリンクを提供
+ * Sidebar コンポーネント - Jira風ダークサイドバー
  */
 "use client";
 
@@ -10,88 +9,114 @@ import {
   LayoutDashboard,
   AlertTriangle,
   GitPullRequest,
-  Search,
+  HelpCircle,
   ClipboardList,
-  Settings,
   ShieldAlert,
   Brain,
   Database,
   ScrollText,
+  ChevronRight,
   type LucideIcon,
 } from "lucide-react";
 
-/** ナビゲーション項目の型 */
+interface NavGroup {
+  label?: string;
+  items: NavItem[];
+}
+
 interface NavItem {
   label: string;
   href: string;
   icon: LucideIcon;
+  badge?: string;
 }
 
-/** サイドバーナビゲーション項目一覧 */
-const navItems: NavItem[] = [
-  { label: "ダッシュボード", href: "/", icon: LayoutDashboard },
-  { label: "インシデント", href: "/incidents", icon: AlertTriangle },
-  { label: "変更管理", href: "/changes", icon: GitPullRequest },
-  { label: "問題管理", href: "/problems", icon: Search },
+const navGroups: NavGroup[] = [
   {
-    label: "サービスリクエスト",
-    href: "/service-requests",
-    icon: ClipboardList,
+    items: [
+      { label: "ダッシュボード", href: "/", icon: LayoutDashboard },
+    ],
   },
-  { label: "SLA監視", href: "/sla", icon: ShieldAlert },
-  { label: "AI分析", href: "/ai", icon: Brain },
-  { label: "CMDB管理", href: "/cmdb", icon: Database },
-  { label: "監査ログ", href: "/audit-logs", icon: ScrollText },
+  {
+    label: "ITSMプロセス",
+    items: [
+      { label: "インシデント", href: "/incidents", icon: AlertTriangle },
+      { label: "変更管理", href: "/changes", icon: GitPullRequest },
+      { label: "問題管理", href: "/problems", icon: HelpCircle },
+      { label: "サービスリクエスト", href: "/service-requests", icon: ClipboardList },
+    ],
+  },
+  {
+    label: "監視・統治",
+    items: [
+      { label: "SLA監視", href: "/sla", icon: ShieldAlert },
+      { label: "AI分析", href: "/ai", icon: Brain },
+      { label: "CMDB管理", href: "/cmdb", icon: Database },
+      { label: "監査ログ", href: "/audit-logs", icon: ScrollText },
+    ],
+  },
 ];
 
 export default function Sidebar() {
   const pathname = usePathname();
 
   return (
-    <aside className="flex h-full w-64 flex-col border-r border-gray-200 bg-white">
-      {/* ロゴ・アプリ名 */}
-      <div className="flex h-16 items-center border-b border-gray-200 px-6">
-        <Link href="/" className="flex items-center gap-2">
-          <Settings className="h-6 w-6 text-primary-600" />
-          <span className="text-lg font-bold text-gray-900">
-            ServiceMatrix
-          </span>
+    <aside className="flex h-full w-60 flex-col bg-[#1e2433] text-gray-100 flex-shrink-0">
+      {/* ロゴ */}
+      <div className="flex h-14 items-center px-4 border-b border-white/10">
+        <Link href="/" className="flex items-center gap-2.5">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-500 font-bold text-white text-sm">
+            SM
+          </div>
+          <div>
+            <div className="text-sm font-bold text-white leading-tight">ServiceMatrix</div>
+            <div className="text-[10px] text-gray-400 leading-tight">ITSM Governance</div>
+          </div>
         </Link>
       </div>
 
       {/* ナビゲーション */}
-      <nav className="flex-1 overflow-y-auto px-3 py-4">
-        <ul className="space-y-1">
-          {navItems.map((item) => {
-            const isActive =
-              pathname === item.href ||
-              (item.href !== "/" && pathname.startsWith(item.href));
+      <nav className="flex-1 overflow-y-auto py-3 px-2">
+        {navGroups.map((group, gi) => (
+          <div key={gi} className={gi > 0 ? "mt-4" : ""}>
+            {group.label && (
+              <p className="mb-1 px-3 text-[10px] font-semibold uppercase tracking-wider text-gray-500">
+                {group.label}
+              </p>
+            )}
+            <ul className="space-y-0.5">
+              {group.items.map((item) => {
+                const isActive =
+                  pathname === item.href ||
+                  (item.href !== "/" && pathname.startsWith(item.href));
 
-            return (
-              <li key={item.href}>
-                <Link
-                  href={item.href}
-                  className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-                    isActive
-                      ? "bg-primary-50 text-primary-700"
-                      : "text-gray-700 hover:bg-gray-100 hover:text-gray-900"
-                  }`}
-                >
-                  <item.icon
-                    className={`h-5 w-5 ${isActive ? "text-primary-600" : "text-gray-400"}`}
-                  />
-                  {item.label}
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
+                return (
+                  <li key={item.href}>
+                    <Link
+                      href={item.href}
+                      className={`flex items-center justify-between rounded-md px-3 py-2 text-sm transition-colors group ${
+                        isActive
+                          ? "bg-blue-600 text-white"
+                          : "text-gray-300 hover:bg-white/10 hover:text-white"
+                      }`}
+                    >
+                      <span className="flex items-center gap-2.5">
+                        <item.icon className={`h-4 w-4 flex-shrink-0 ${isActive ? "text-white" : "text-gray-400 group-hover:text-white"}`} />
+                        <span className="truncate">{item.label}</span>
+                      </span>
+                      {isActive && <ChevronRight className="h-3.5 w-3.5 text-white/60" />}
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        ))}
       </nav>
 
       {/* フッター */}
-      <div className="border-t border-gray-200 px-6 py-3">
-        <p className="text-xs font-medium text-gray-500">ServiceMatrix</p>
-        <p className="text-xs text-gray-400">v0.1.0 · ITSM Governance Platform</p>
+      <div className="border-t border-white/10 px-4 py-3">
+        <p className="text-[10px] text-gray-500">v1.0.0 · ITIL 4 準拠</p>
       </div>
     </aside>
   );
