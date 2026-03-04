@@ -1,7 +1,8 @@
 """Celery タスク定義"""
 
-import asyncio
 from datetime import UTC, datetime
+
+from asgiref.sync import async_to_sync
 
 from src.core.logging import get_logger
 from src.worker.celery_app import celery_app
@@ -14,7 +15,7 @@ def check_sla_breaches(self):
     """SLA違反チェックタスク（定期実行）"""
     try:
         logger.info("sla_check_started", task_id=self.request.id)
-        result = asyncio.run(_check_sla_async())
+        result = async_to_sync(_check_sla_async)()
         logger.info("sla_check_completed", breaches=result.get("breaches", 0))
         return result
     except Exception as exc:
@@ -61,7 +62,7 @@ def ai_triage_incident(self, incident_id: str, title: str, description: str):
     """AI インシデント自動分類タスク"""
     try:
         logger.info("ai_triage_started", incident_id=incident_id)
-        result = asyncio.run(_ai_triage_async(incident_id, title, description))
+        result = async_to_sync(_ai_triage_async)(incident_id, title, description)
         return result
     except Exception as exc:
         logger.warning("ai_triage_failed", incident_id=incident_id, error=str(exc))
