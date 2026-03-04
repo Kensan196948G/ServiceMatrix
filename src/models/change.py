@@ -38,6 +38,7 @@ class ChangeStatus(enum.StrEnum):
     SCHEDULED = "Scheduled"
     IN_PROGRESS = "In_Progress"
     COMPLETED = "Completed"
+    CLOSED = "Closed"
     CANCELLED = "Cancelled"
     FAILED = "Failed"
 
@@ -52,7 +53,7 @@ class Change(Base, TimestampMixin):
         ),
         CheckConstraint(
             "status IN ('Draft','Submitted','CAB_Review','Approved','Rejected',"
-            "'Scheduled','In_Progress','Completed','Cancelled','Failed')",
+            "'Scheduled','In_Progress','Completed','Closed','Cancelled','Failed')",
             name="chk_change_status",
         ),
         CheckConstraint("risk_score >= 0 AND risk_score <= 100", name="chk_change_risk_score"),

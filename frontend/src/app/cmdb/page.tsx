@@ -8,7 +8,7 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ChevronLeft, ChevronRight, X, Search, Plus, Share2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, X, Search, Plus, Share2, Download, Upload } from "lucide-react";
 import apiClient from "@/lib/api";
 import Table from "@/components/ui/Table";
 import Badge from "@/components/ui/Badge";
@@ -49,8 +49,40 @@ export default function CMDBPage() {
   const [filterStatus, setFilterStatus] = useState("");
   const [selectedCI, setSelectedCI] = useState<CI | null>(null);
   const [showCreate, setShowCreate] = useState(false);
+  const [showExportMenu, setShowExportMenu] = useState(false);
+  const [importResult, setImportResult] = useState<{ created: number; failed: number; errors: string[] } | null>(null);
   const [form, setForm] = useState({ ci_name: "", ci_type: "Server", ci_class: "", version: "", description: "" });
   const [createError, setCreateError] = useState("");
+
+  const handleExport = async (format: "json" | "csv") => {
+    setShowExportMenu(false);
+    const response = await apiClient.get(`/cmdb/export?format=${format}`, { responseType: "blob" });
+    const url = URL.createObjectURL(response.data as Blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `cmdb_export.${format}`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const formData = new FormData();
+    formData.append("file", file);
+    try {
+      const res = await apiClient.post<{ created: number; failed: number; errors: string[] }>(
+        "/cmdb/import",
+        formData,
+        { headers: { "Content-Type": "multipart/form-data" } }
+      );
+      setImportResult(res.data);
+      queryClient.invalidateQueries({ queryKey: ["cmdb-cis"] });
+    } catch {
+      setImportResult({ created: 0, failed: 1, errors: ["インポートに失敗しました"] });
+    }
+    e.target.value = "";
+  };
 
   const createMutation = useMutation({
     mutationFn: (data: typeof form) =>
@@ -139,6 +171,36 @@ export default function CMDBPage() {
         <h1 className="text-2xl font-bold text-gray-900">CMDB管理</h1>
         <div className="flex items-center gap-3">
           <span className="text-sm text-gray-500">{total} 件</span>
+          {/* エクスポートドロップダウン */}
+          <div className="relative">
+            <button
+              onClick={() => setShowExportMenu((v) => !v)}
+              className="flex items-center gap-1.5 rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition"
+            >
+              <Download className="h-4 w-4" /> エクスポート
+            </button>
+            {showExportMenu && (
+              <div className="absolute right-0 mt-1 w-36 rounded-lg border border-gray-200 bg-white shadow-lg z-10">
+                <button
+                  onClick={() => handleExport("json")}
+                  className="block w-full px-4 py-2 text-left text-sm hover:bg-gray-50"
+                >
+                  JSON形式
+                </button>
+                <button
+                  onClick={() => handleExport("csv")}
+                  className="block w-full px-4 py-2 text-left text-sm hover:bg-gray-50"
+                >
+                  CSV形式
+                </button>
+              </div>
+            )}
+          </div>
+          {/* インポートボタン */}
+          <label className="flex cursor-pointer items-center gap-1.5 rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition">
+            <Upload className="h-4 w-4" /> インポート
+            <input type="file" accept=".csv,.json" onChange={handleImport} className="hidden" />
+          </label>
           <button
             onClick={() => setShowCreate(true)}
             className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 transition"
@@ -153,6 +215,25 @@ export default function CMDBPage() {
           </Link>
         </div>
       </div>
+
+      {/* インポート結果表示 */}
+      {importResult && (
+        <div className={`mb-4 rounded-lg border p-3 text-sm ${importResult.failed > 0 ? "border-orange-200 bg-orange-50" : "border-green-200 bg-green-50"}`}>
+          <div className="flex items-center justify-between">
+            <span className={importResult.failed > 0 ? "text-orange-800" : "text-green-800"}>
+              インポート完了: {importResult.created} 件作成、{importResult.failed} 件失敗
+            </span>
+            <button onClick={() => setImportResult(null)} className="text-gray-400 hover:text-gray-600">
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+          {importResult.errors.length > 0 && (
+            <ul className="mt-2 space-y-0.5 text-xs text-orange-700">
+              {importResult.errors.map((e, i) => <li key={i}>・{e}</li>)}
+            </ul>
+          )}
+        </div>
+      )}
 
       {/* フィルター・検索バー */}
       <div className="mb-4 flex flex-wrap gap-3 rounded-lg border border-gray-200 bg-white p-3 shadow-sm">

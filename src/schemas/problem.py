@@ -25,6 +25,20 @@ class ProblemUpdate(BaseModel):
     root_cause: str | None = None
 
 
+class RCARequest(BaseModel):
+    root_cause: str = Field(..., min_length=1)
+    contributing_factors: list[str] = []
+    permanent_fix: str | None = None
+
+
+class WorkaroundUpdate(BaseModel):
+    workaround: str = Field(..., min_length=1)
+
+
+class KnownErrorRequest(BaseModel):
+    workaround: str = Field(..., min_length=1)
+
+
 class ProblemStatusTransition(BaseModel):
     new_status: str
     notes: str | None = None

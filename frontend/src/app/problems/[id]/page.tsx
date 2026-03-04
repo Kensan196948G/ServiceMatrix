@@ -15,6 +15,9 @@ import {
   ChevronDown,
   Save,
   Loader2,
+  Plus,
+  X,
+  Edit2,
 } from "lucide-react";
 import apiClient from "@/lib/api";
 
@@ -68,12 +71,25 @@ export default function ProblemDetailPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
 
+  // Status transition state
   const [showTransition, setShowTransition] = useState(false);
   const [transitionNotes, setTransitionNotes] = useState("");
   const [selectedStatus, setSelectedStatus] = useState("");
-  const [rootCause, setRootCause] = useState("");
+
+  // RCA form state
+  const [rcaRootCause, setRcaRootCause] = useState("");
+  const [rcaFactors, setRcaFactors] = useState<string[]>([]);
+  const [rcaFactorInput, setRcaFactorInput] = useState("");
+  const [rcaPermanentFix, setRcaPermanentFix] = useState("");
+  const [showRcaForm, setShowRcaForm] = useState(false);
+
+  // Workaround state
   const [workaround, setWorkaround] = useState("");
   const [showKnownError, setShowKnownError] = useState(false);
+  const [editingWorkaround, setEditingWorkaround] = useState(false);
+  const [workaroundEdit, setWorkaroundEdit] = useState("");
+
+  // Auto-RCA state
   const [rcaLoading, setRcaLoading] = useState(false);
   const [rcaResult, setRcaResult] = useState<string | null>(null);
 
@@ -102,19 +118,27 @@ export default function ProblemDetailPage() {
     },
   });
 
-  const updateMutation = useMutation({
-    mutationFn: async (data: { root_cause?: string }) => {
-      const res = await apiClient.patch(`/problems/${id}`, data);
+  const rcaMutation = useMutation({
+    mutationFn: async (data: {
+      root_cause: string;
+      contributing_factors: string[];
+      permanent_fix?: string;
+    }) => {
+      const res = await apiClient.post(`/problems/${id}/rca`, data);
       return res.data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["problem", id] });
+      setShowRcaForm(false);
+      setRcaRootCause("");
+      setRcaFactors([]);
+      setRcaPermanentFix("");
     },
   });
 
   const knownErrorMutation = useMutation({
     mutationFn: async (wa: string) => {
-      const res = await apiClient.post(`/problems/${id}/known-error`, { workaround: wa });
+      const res = await apiClient.post(`/problems/${id}/mark-known-error`, { workaround: wa });
       return res.data;
     },
     onSuccess: () => {
@@ -124,11 +148,23 @@ export default function ProblemDetailPage() {
     },
   });
 
+  const workaroundUpdateMutation = useMutation({
+    mutationFn: async (wa: string) => {
+      const res = await apiClient.post(`/problems/${id}/mark-known-error`, { workaround: wa });
+      return res.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["problem", id] });
+      setEditingWorkaround(false);
+      setWorkaroundEdit("");
+    },
+  });
+
   const runRCA = async () => {
     setRcaLoading(true);
     setRcaResult(null);
     try {
-      const res = await apiClient.post(`/problems/${id}/analyze-rca`);
+      const res = await apiClient.post(`/problems/${id}/analyze`);
       setRcaResult(res.data?.analysis ?? "分析が完了しました。");
       queryClient.invalidateQueries({ queryKey: ["problem", id] });
     } catch {
@@ -136,6 +172,17 @@ export default function ProblemDetailPage() {
     } finally {
       setRcaLoading(false);
     }
+  };
+
+  const addFactor = () => {
+    if (rcaFactorInput.trim()) {
+      setRcaFactors(prev => [...prev, rcaFactorInput.trim()]);
+      setRcaFactorInput("");
+    }
+  };
+
+  const removeFactor = (idx: number) => {
+    setRcaFactors(prev => prev.filter((_, i) => i !== idx));
   };
 
   if (isLoading) {
@@ -171,7 +218,7 @@ export default function ProblemDetailPage() {
           <ArrowLeft className="h-4 w-4" />
           問題一覧に戻る
         </button>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
           {transitions.length > 0 && (
             <button
               onClick={() => setShowTransition(!showTransition)}
@@ -195,9 +242,9 @@ export default function ProblemDetailPage() {
 
       {/* Title card */}
       <div className="bg-white rounded-xl border border-gray-200 p-6">
-        <div className="flex items-start justify-between mb-4">
+        <div className="flex items-start justify-between mb-4 flex-wrap gap-4">
           <div>
-            <div className="flex items-center gap-3 mb-2">
+            <div className="flex items-center gap-3 mb-2 flex-wrap">
               <span className="text-xs font-mono text-gray-400 bg-gray-100 px-2 py-0.5 rounded">
                 {problem.problem_number}
               </span>
@@ -208,8 +255,8 @@ export default function ProblemDetailPage() {
                 {problem.status.replace(/_/g, " ")}
               </span>
               {problem.known_error && (
-                <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-orange-100 text-orange-700">
-                  既知エラー
+                <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-orange-100 text-orange-700 border border-orange-300">
+                  ⚠ 既知エラー
                 </span>
               )}
             </div>
@@ -244,7 +291,7 @@ export default function ProblemDetailPage() {
       {showTransition && (
         <div className="bg-white rounded-xl border border-blue-200 p-6">
           <h3 className="font-semibold text-gray-800 mb-4">ステータス変更</h3>
-          <div className="flex gap-3 mb-4">
+          <div className="flex gap-3 mb-4 flex-wrap">
             {transitions.map(s => (
               <button
                 key={s}
@@ -310,14 +357,48 @@ export default function ProblemDetailPage() {
         </div>
       )}
 
-      {/* Workaround display */}
+      {/* Workaround display + edit */}
       {problem.workaround && (
-        <div className="bg-orange-50 border border-orange-200 rounded-xl p-5">
-          <h3 className="font-semibold text-orange-700 mb-2 flex items-center gap-2">
-            <Shield className="h-4 w-4" />
-            回避策（ワークアラウンド）
-          </h3>
-          <p className="text-sm text-orange-800 leading-relaxed">{problem.workaround}</p>
+        <div className="bg-orange-50 border border-orange-200 rounded-xl p-5 space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="font-semibold text-orange-700 flex items-center gap-2">
+              <Shield className="h-4 w-4" />
+              回避策（ワークアラウンド）
+            </h3>
+            {problem.status !== "Resolved" && problem.status !== "Closed" && (
+              <button
+                onClick={() => { setEditingWorkaround(true); setWorkaroundEdit(problem.workaround ?? ""); }}
+                className="flex items-center gap-1 text-xs text-orange-600 hover:text-orange-800"
+              >
+                <Edit2 className="h-3.5 w-3.5" />
+                編集
+              </button>
+            )}
+          </div>
+          {editingWorkaround ? (
+            <div className="space-y-2">
+              <textarea
+                value={workaroundEdit}
+                onChange={e => setWorkaroundEdit(e.target.value)}
+                rows={4}
+                className="w-full border border-orange-300 rounded-lg p-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-orange-400 bg-white"
+              />
+              <div className="flex gap-2">
+                <button
+                  disabled={!workaroundEdit.trim() || workaroundUpdateMutation.isPending}
+                  onClick={() => workaroundUpdateMutation.mutate(workaroundEdit)}
+                  className="px-3 py-1.5 bg-orange-500 text-white text-xs rounded-lg hover:bg-orange-600 disabled:opacity-50"
+                >
+                  {workaroundUpdateMutation.isPending ? "保存中..." : "保存"}
+                </button>
+                <button onClick={() => setEditingWorkaround(false)} className="px-3 py-1.5 text-gray-600 text-xs">
+                  キャンセル
+                </button>
+              </div>
+            </div>
+          ) : (
+            <p className="text-sm text-orange-800 leading-relaxed">{problem.workaround}</p>
+          )}
         </div>
       )}
 
@@ -328,41 +409,109 @@ export default function ProblemDetailPage() {
             <Brain className="h-5 w-5 text-indigo-500" />
             根本原因分析（RCA）
           </h3>
-          <button
-            onClick={runRCA}
-            disabled={rcaLoading}
-            className="flex items-center gap-2 px-3 py-1.5 bg-indigo-600 text-white text-xs rounded-lg hover:bg-indigo-700 disabled:opacity-50"
-          >
-            {rcaLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Brain className="h-3 w-3" />}
-            AI分析実行
-          </button>
+          <div className="flex gap-2">
+            {problem.status !== "Resolved" && problem.status !== "Closed" && (
+              <button
+                onClick={() => setShowRcaForm(!showRcaForm)}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 text-indigo-700 text-xs rounded-lg hover:bg-indigo-100 border border-indigo-200"
+              >
+                <Edit2 className="h-3 w-3" />
+                RCA入力
+              </button>
+            )}
+            <button
+              onClick={runRCA}
+              disabled={rcaLoading}
+              className="flex items-center gap-2 px-3 py-1.5 bg-indigo-600 text-white text-xs rounded-lg hover:bg-indigo-700 disabled:opacity-50"
+            >
+              {rcaLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Brain className="h-3 w-3" />}
+              AI分析実行
+            </button>
+          </div>
         </div>
 
-        {problem.root_cause || rcaResult ? (
-          <div className="bg-indigo-50 rounded-lg p-4 text-sm text-indigo-900 leading-relaxed">
+        {/* RCA display */}
+        {(problem.root_cause || rcaResult) ? (
+          <div className="bg-indigo-50 rounded-lg p-4 text-sm text-indigo-900 leading-relaxed whitespace-pre-wrap">
             {rcaResult ?? problem.root_cause}
           </div>
         ) : (
           <p className="text-sm text-gray-400">根本原因はまだ特定されていません。「AI分析実行」で自動分析を開始できます。</p>
         )}
 
-        {!problem.root_cause && (
-          <div className="mt-4">
-            <textarea
-              value={rootCause}
-              onChange={e => setRootCause(e.target.value)}
-              placeholder="手動で根本原因を入力..."
-              rows={3}
-              className="w-full border border-gray-200 rounded-lg p-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-indigo-400"
-            />
-            <button
-              disabled={!rootCause.trim() || updateMutation.isPending}
-              onClick={() => updateMutation.mutate({ root_cause: rootCause })}
-              className="mt-2 flex items-center gap-2 px-3 py-1.5 bg-indigo-600 text-white text-xs rounded-lg hover:bg-indigo-700 disabled:opacity-50"
-            >
-              <Save className="h-3 w-3" />
-              保存
-            </button>
+        {/* RCA manual form */}
+        {showRcaForm && (
+          <div className="mt-4 space-y-4 border-t border-gray-100 pt-4">
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">根本原因 <span className="text-red-500">*</span></label>
+              <textarea
+                value={rcaRootCause}
+                onChange={e => setRcaRootCause(e.target.value)}
+                placeholder="根本原因を詳しく記述してください..."
+                rows={4}
+                className="w-full border border-gray-200 rounded-lg p-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-indigo-400"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">寄与要因</label>
+              <div className="flex gap-2 mb-2">
+                <input
+                  value={rcaFactorInput}
+                  onChange={e => setRcaFactorInput(e.target.value)}
+                  onKeyDown={e => e.key === "Enter" && (e.preventDefault(), addFactor())}
+                  placeholder="要因を入力してEnterで追加..."
+                  className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                />
+                <button
+                  onClick={addFactor}
+                  className="px-3 py-2 bg-gray-100 text-gray-600 rounded-lg text-sm hover:bg-gray-200"
+                >
+                  <Plus className="h-4 w-4" />
+                </button>
+              </div>
+              {rcaFactors.length > 0 && (
+                <ul className="space-y-1">
+                  {rcaFactors.map((f, i) => (
+                    <li key={i} className="flex items-center justify-between bg-indigo-50 rounded-lg px-3 py-1.5 text-sm">
+                      <span className="text-indigo-800">• {f}</span>
+                      <button onClick={() => removeFactor(i)} className="text-gray-400 hover:text-red-500">
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">恒久的修正方法</label>
+              <textarea
+                value={rcaPermanentFix}
+                onChange={e => setRcaPermanentFix(e.target.value)}
+                placeholder="恒久的な修正方法・対策を記述してください（任意）..."
+                rows={3}
+                className="w-full border border-gray-200 rounded-lg p-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-indigo-400"
+              />
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                disabled={!rcaRootCause.trim() || rcaMutation.isPending}
+                onClick={() => rcaMutation.mutate({
+                  root_cause: rcaRootCause,
+                  contributing_factors: rcaFactors,
+                  permanent_fix: rcaPermanentFix || undefined,
+                })}
+                className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 disabled:opacity-50"
+              >
+                <Save className="h-4 w-4" />
+                {rcaMutation.isPending ? "保存中..." : "RCA保存"}
+              </button>
+              <button onClick={() => setShowRcaForm(false)} className="px-4 py-2 text-gray-600 text-sm">
+                キャンセル
+              </button>
+            </div>
           </div>
         )}
       </div>

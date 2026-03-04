@@ -18,6 +18,7 @@ from src.schemas.change import (
     ChangeResponse,
     ChangeStatusTransition,
     ChangeUpdate,
+    ScheduleRequest,
 )
 from src.schemas.change_risk import RiskAssessmentResultSchema
 from src.schemas.common import PaginatedResponse
@@ -296,3 +297,157 @@ async def assess_change_risk(
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
     return RiskAssessmentResultSchema(**result.__dict__)
+
+
+@router.post(
+    "/{change_id}/submit-for-cab",
+    response_model=ChangeResponse,
+    summary="CABレビュー申請",
+    description="変更申請をCABレビュー待ちにします（Draft → Submitted）。",
+)
+async def submit_for_cab(
+    change_id: uuid.UUID,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[
+        User,
+        Depends(require_role(UserRole.SYSTEM_ADMIN, UserRole.CHANGE_MANAGER)),
+    ],
+):
+    """変更申請をCABレビュー申請（Draft → Submitted）"""
+    result = await db.execute(select(Change).where(Change.change_id == change_id))
+    change = result.scalar_one_or_none()
+    if not change:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="変更が見つかりません")
+    try:
+        change = await change_service.transition_change_status(db, change, "Submitted")
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e)) from e
+    await ws_manager.broadcast(
+        {"type": "change_update", "action": "submitted", "change_id": str(change.change_id)},
+        channel="changes",
+    )
+    return change
+
+
+@router.post(
+    "/{change_id}/schedule",
+    response_model=ChangeResponse,
+    summary="実装スケジュール設定",
+    description="CAB承認後に実装スケジュールを設定します（Approved → Scheduled）。",
+)
+async def schedule_change(
+    change_id: uuid.UUID,
+    data: ScheduleRequest,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[
+        User,
+        Depends(require_role(UserRole.SYSTEM_ADMIN, UserRole.CHANGE_MANAGER)),
+    ],
+):
+    """CAB承認済み変更に実装スケジュールを設定（Approved → Scheduled）"""
+    result = await db.execute(select(Change).where(Change.change_id == change_id))
+    change = result.scalar_one_or_none()
+    if not change:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="変更が見つかりません")
+    change.scheduled_start_at = data.scheduled_start_at
+    if data.scheduled_end_at:
+        change.scheduled_end_at = data.scheduled_end_at
+    try:
+        change = await change_service.transition_change_status(db, change, "Scheduled")
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e)) from e
+    await ws_manager.broadcast(
+        {"type": "change_update", "action": "scheduled", "change_id": str(change.change_id)},
+        channel="changes",
+    )
+    return change
+
+
+@router.post(
+    "/{change_id}/implement",
+    response_model=ChangeResponse,
+    summary="実装開始",
+    description="スケジュール済み変更の実装を開始します（Scheduled → In_Progress）。",
+)
+async def implement_change(
+    change_id: uuid.UUID,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[
+        User,
+        Depends(require_role(UserRole.SYSTEM_ADMIN, UserRole.CHANGE_MANAGER)),
+    ],
+):
+    """変更実装開始（Scheduled → In_Progress）"""
+    result = await db.execute(select(Change).where(Change.change_id == change_id))
+    change = result.scalar_one_or_none()
+    if not change:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="変更が見つかりません")
+    try:
+        change = await change_service.transition_change_status(db, change, "In_Progress")
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e)) from e
+    await ws_manager.broadcast(
+        {"type": "change_update", "action": "in_progress", "change_id": str(change.change_id)},
+        channel="changes",
+    )
+    return change
+
+
+@router.post(
+    "/{change_id}/complete",
+    response_model=ChangeResponse,
+    summary="実装完了",
+    description="実施中変更の実装を完了します（In_Progress → Completed）。",
+)
+async def complete_change(
+    change_id: uuid.UUID,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[
+        User,
+        Depends(require_role(UserRole.SYSTEM_ADMIN, UserRole.CHANGE_MANAGER)),
+    ],
+):
+    """変更実装完了（In_Progress → Completed）"""
+    result = await db.execute(select(Change).where(Change.change_id == change_id))
+    change = result.scalar_one_or_none()
+    if not change:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="変更が見つかりません")
+    try:
+        change = await change_service.transition_change_status(db, change, "Completed")
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e)) from e
+    await ws_manager.broadcast(
+        {"type": "change_update", "action": "completed", "change_id": str(change.change_id)},
+        channel="changes",
+    )
+    return change
+
+
+@router.post(
+    "/{change_id}/close",
+    response_model=ChangeResponse,
+    summary="クローズ",
+    description="完了済み変更をクローズします（Completed → Closed）。",
+)
+async def close_change(
+    change_id: uuid.UUID,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[
+        User,
+        Depends(require_role(UserRole.SYSTEM_ADMIN, UserRole.CHANGE_MANAGER)),
+    ],
+):
+    """変更クローズ（Completed → Closed）"""
+    result = await db.execute(select(Change).where(Change.change_id == change_id))
+    change = result.scalar_one_or_none()
+    if not change:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="変更が見つかりません")
+    try:
+        change = await change_service.transition_change_status(db, change, "Closed")
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e)) from e
+    await ws_manager.broadcast(
+        {"type": "change_update", "action": "closed", "change_id": str(change.change_id)},
+        channel="changes",
+    )
+    return change
