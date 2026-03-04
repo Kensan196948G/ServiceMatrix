@@ -190,6 +190,44 @@ async def transition_incident_status(
     return incident
 
 
+@router.post(
+    "/{incident_id}/ai-triage",
+    summary="AIトリアージ実行",
+    description="指定インシデントに対してAIトリアージを手動実行し結果を返します。",
+)
+async def run_ai_triage(
+    incident_id: uuid.UUID,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[
+        User,
+        Depends(
+            require_role(
+                UserRole.SYSTEM_ADMIN,
+                UserRole.SERVICE_MANAGER,
+                UserRole.INCIDENT_MANAGER,
+                UserRole.OPERATOR,
+                UserRole.VIEWER,
+            )
+        ),
+    ],
+) -> dict:
+    """AIトリアージを手動実行して結果を返す"""
+    result = await db.execute(select(Incident).where(Incident.incident_id == incident_id))
+    incident = result.scalar_one_or_none()
+    if not incident:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="インシデントが見つかりません")
+    triage_result = await ai_triage_service.apply_triage_to_incident(db, str(incident_id))
+    await db.flush()
+    return {
+        "incident_id": str(incident_id),
+        "priority": triage_result.priority,
+        "category": triage_result.category,
+        "confidence": triage_result.confidence,
+        "reasoning": triage_result.reasoning,
+        "ai_triage_notes": incident.ai_triage_notes,
+    }
+
+
 @router.patch(
     "/bulk/assign",
     summary="インシデント一括担当者割り当て",

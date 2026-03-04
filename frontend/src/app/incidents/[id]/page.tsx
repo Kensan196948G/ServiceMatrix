@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft, Clock, AlertTriangle, CheckCircle, XCircle,
-  RefreshCw, User, Tag, Calendar, MessageSquare, Send
+  RefreshCw, User, Tag, Calendar, MessageSquare, Send, Brain, Loader2, Sparkles
 } from "lucide-react";
 import apiClient from "@/lib/api";
 import type { IncidentResponse } from "@/types/api";
@@ -106,6 +106,10 @@ export default function IncidentDetailPage() {
   const queryClient = useQueryClient();
   const [comment, setComment] = useState("");
   const [comments, setComments] = useState<{ text: string; time: string }[]>([]);
+  const [aiTriageResult, setAiTriageResult] = useState<{
+    priority: string; category: string; confidence: number; reasoning: string;
+  } | null>(null);
+  const [aiTriageLoading, setAiTriageLoading] = useState(false);
 
   const { data: incident, isLoading, error } = useQuery<IncidentResponse>({
     queryKey: ["incident", id],
@@ -126,6 +130,26 @@ export default function IncidentDetailPage() {
     if (!comment.trim()) return;
     setComments(prev => [...prev, { text: comment, time: new Date().toLocaleString("ja-JP") }]);
     setComment("");
+  };
+
+  const runAiTriage = async () => {
+    if (!id) return;
+    setAiTriageLoading(true);
+    setAiTriageResult(null);
+    try {
+      const res = await apiClient.post(`/incidents/${id}/ai-triage`);
+      setAiTriageResult({
+        priority: res.data.priority,
+        category: res.data.category,
+        confidence: res.data.confidence,
+        reasoning: res.data.reasoning,
+      });
+      queryClient.invalidateQueries({ queryKey: ["incident", id] });
+    } catch {
+      setAiTriageResult({ priority: "—", category: "—", confidence: 0, reasoning: "AI分析に失敗しました。" });
+    } finally {
+      setAiTriageLoading(false);
+    }
   };
 
   if (isLoading) {
@@ -214,17 +238,63 @@ export default function IncidentDetailPage() {
             <p className="text-sm text-gray-700 whitespace-pre-wrap">
               {incident.description ?? "説明なし"}
             </p>
-            {incident.ai_triage_notes && (
-              <div className="mt-4 rounded-lg bg-purple-50 border border-purple-200 p-3">
-                <p className="text-xs font-semibold text-purple-700 mb-1">🤖 AI トリアージノート</p>
-                <p className="text-sm text-purple-800">{incident.ai_triage_notes}</p>
-              </div>
-            )}
             {incident.resolution_notes && (
               <div className="mt-4 rounded-lg bg-green-50 border border-green-200 p-3">
                 <p className="text-xs font-semibold text-green-700 mb-1">✅ 解決メモ</p>
                 <p className="text-sm text-green-800">{incident.resolution_notes}</p>
               </div>
+            )}
+          </div>
+
+          {/* AIトリアージ */}
+          <div className="bg-white rounded-lg border border-gray-200 p-5">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-semibold text-gray-900 flex items-center gap-2">
+                <Brain className="w-4 h-4 text-purple-500" />
+                AI トリアージ
+              </h2>
+              <button
+                onClick={runAiTriage}
+                disabled={aiTriageLoading}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-600 text-white text-xs rounded-lg hover:bg-purple-700 disabled:opacity-50 transition"
+              >
+                {aiTriageLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
+                AI分析実行
+              </button>
+            </div>
+            {(aiTriageResult || incident.ai_triage_notes) ? (
+              <div className="space-y-3">
+                {aiTriageResult && (
+                  <div className="grid grid-cols-3 gap-3 mb-3">
+                    <div className="bg-purple-50 rounded-lg p-3 text-center">
+                      <p className="text-xs text-purple-500 font-medium">推奨優先度</p>
+                      <p className="text-lg font-bold text-purple-800">{aiTriageResult.priority}</p>
+                    </div>
+                    <div className="bg-blue-50 rounded-lg p-3 text-center">
+                      <p className="text-xs text-blue-500 font-medium">カテゴリ</p>
+                      <p className="text-sm font-bold text-blue-800">{aiTriageResult.category}</p>
+                    </div>
+                    <div className="bg-green-50 rounded-lg p-3 text-center">
+                      <p className="text-xs text-green-500 font-medium">信頼度</p>
+                      <p className="text-lg font-bold text-green-800">{Math.round(aiTriageResult.confidence * 100)}%</p>
+                    </div>
+                  </div>
+                )}
+                {aiTriageResult?.reasoning && (
+                  <div className="rounded-lg bg-purple-50 border border-purple-200 p-3">
+                    <p className="text-xs font-semibold text-purple-700 mb-1">推論</p>
+                    <p className="text-sm text-purple-800">{aiTriageResult.reasoning}</p>
+                  </div>
+                )}
+                {incident.ai_triage_notes && !aiTriageResult && (
+                  <div className="rounded-lg bg-purple-50 border border-purple-200 p-3">
+                    <p className="text-xs font-semibold text-purple-700 mb-1">🤖 AI トリアージノート</p>
+                    <p className="text-sm text-purple-800 whitespace-pre-line">{incident.ai_triage_notes}</p>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <p className="text-sm text-gray-400">AIトリアージ未実行。「AI分析実行」ボタンで自動分析を開始できます。</p>
             )}
           </div>
 

@@ -76,6 +76,12 @@ export default function IncidentsPage() {
     retry: 1,
   });
 
+  const { data: usersData } = useQuery<{ user_id: string; username: string; full_name: string | null }[]>({
+    queryKey: ["users-list"],
+    queryFn: () => apiClient.get("/auth/users").then(r => r.data),
+    retry: false,
+  });
+
   const createMutation = useMutation({
     mutationFn: (body: Record<string, string>) => apiClient.post("/incidents", body).then(r => r.data),
     onSuccess: () => {
@@ -255,13 +261,18 @@ export default function IncidentsPage() {
                 </button>
                 {/* 一括担当者割り当て */}
                 <span className="text-blue-300">|</span>
-                <input
-                  type="text"
+                <select
                   value={bulkAssignee}
                   onChange={e => setBulkAssignee(e.target.value)}
-                  placeholder="担当者UUID..."
-                  className="rounded border border-blue-300 px-2 py-1 text-xs bg-white w-56"
-                />
+                  className="rounded border border-blue-300 px-2 py-1 text-xs bg-white w-48"
+                >
+                  <option value="">担当者を選択...</option>
+                  {(usersData ?? []).map(u => (
+                    <option key={u.user_id} value={u.user_id}>
+                      {u.full_name || u.username}
+                    </option>
+                  ))}
+                </select>
                 <button
                   disabled={!bulkAssignee || bulkAssignMutation.isPending}
                   onClick={() => bulkAssignMutation.mutate(bulkAssignee)}
