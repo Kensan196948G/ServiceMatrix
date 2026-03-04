@@ -4,13 +4,22 @@
  */
 "use client";
 
-import { useState, useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { AlertCircle, Clock, RefreshCw } from "lucide-react";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { AlertCircle, Clock, RefreshCw, BellRing, X } from "lucide-react";
 import apiClient from "@/lib/api";
 import Badge, { getPriorityVariant } from "@/components/ui/Badge";
 import LoadingSpinner from "@/components/ui/LoadingSpinner";
 import type { IncidentResponse, PaginatedResponse } from "@/types/api";
+
+interface SLAAlert {
+  id: string;
+  message: string;
+  incident_number?: string;
+  priority?: string;
+  type: "breach" | "warning";
+  at: number;
+}
 
 // SLA目標時間（分）
 const SLA_TARGETS: Record<string, number> = {
@@ -111,10 +120,98 @@ function SLAStatusBadge({ breached, dueAt }: { breached: boolean; dueAt: string 
 type Priority = "ALL" | "P1" | "P2" | "P3" | "P4";
 type SLAFilter = "ALL" | "breached" | "warning" | "ok";
 
+/** SLAアラートトースト */
+function SLAAlertToast({
+  alerts,
+  onDismiss,
+}: {
+  alerts: SLAAlert[];
+  onDismiss: (id: string) => void;
+}) {
+  if (alerts.length === 0) return null;
+  return (
+    <div className="fixed bottom-4 right-4 z-50 space-y-2 max-w-sm">
+      {alerts.map((a) => (
+        <div
+          key={a.id}
+          className={`flex items-start gap-3 rounded-lg px-4 py-3 shadow-lg border ${
+            a.type === "breach"
+              ? "bg-red-50 border-red-300 text-red-800"
+              : "bg-orange-50 border-orange-300 text-orange-800"
+          }`}
+        >
+          <BellRing className="mt-0.5 h-4 w-4 shrink-0" />
+          <div className="flex-1 text-sm">
+            <p className="font-medium">
+              {a.type === "breach" ? "⚠️ SLA違反" : "🔔 SLA警告"}
+            </p>
+            <p>{a.message}</p>
+            {a.incident_number && (
+              <p className="text-xs opacity-75">{a.incident_number}</p>
+            )}
+          </div>
+          <button onClick={() => onDismiss(a.id)}>
+            <X className="h-4 w-4 opacity-60 hover:opacity-100" />
+          </button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function SLADashboardPage() {
   const [priorityFilter, setPriorityFilter] = useState<Priority>("ALL");
   const [slaFilter, setSlaFilter] = useState<SLAFilter>("ALL");
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
+  const [slaAlerts, setSlaAlerts] = useState<SLAAlert[]>([]);
+  const wsRef = useRef<WebSocket | null>(null);
+  const queryClient = useQueryClient();
+
+  // WebSocket: sla_alerts チャンネル購読
+  const connectWS = useCallback(() => {
+    const token =
+      typeof window !== "undefined" ? localStorage.getItem("access_token") : null;
+    if (!token) return;
+    const proto = window.location.protocol === "https:" ? "wss" : "ws";
+    const host = window.location.hostname;
+    const ws = new WebSocket(
+      `${proto}://${host}:8001/api/v1/ws/sla_alerts?token=${token}`
+    );
+    ws.onmessage = (ev) => {
+      try {
+        const data = JSON.parse(ev.data);
+        const alert: SLAAlert = {
+          id: `${Date.now()}-${Math.random()}`,
+          message: data.message || data.title || "SLAアラート",
+          incident_number: data.incident_number,
+          priority: data.priority,
+          type: data.event_type === "sla_breach" ? "breach" : "warning",
+          at: Date.now(),
+        };
+        setSlaAlerts((prev) => [alert, ...prev].slice(0, 5));
+        queryClient.invalidateQueries({ queryKey: ["sla-incidents"] });
+      } catch {}
+    };
+    ws.onclose = () => {
+      setTimeout(connectWS, 5000);
+    };
+    wsRef.current = ws;
+  }, [queryClient]);
+
+  useEffect(() => {
+    connectWS();
+    return () => wsRef.current?.close();
+  }, [connectWS]);
+
+  // 30秒後に自動消去
+  useEffect(() => {
+    if (slaAlerts.length === 0) return;
+    const timer = setTimeout(() => {
+      const cutoff = Date.now() - 30_000;
+      setSlaAlerts((prev) => prev.filter((a) => a.at > cutoff));
+    }, 30_000);
+    return () => clearTimeout(timer);
+  }, [slaAlerts]);
 
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ["sla-incidents"],
@@ -186,6 +283,12 @@ export default function SLADashboardPage() {
 
   return (
     <div>
+      {/* SLAリアルタイムアラートトースト */}
+      <SLAAlertToast
+        alerts={slaAlerts}
+        onDismiss={(id) => setSlaAlerts((prev) => prev.filter((a) => a.id !== id))}
+      />
+
       {/* ヘッダー */}
       <div className="mb-6 flex items-center justify-between">
         <div>
