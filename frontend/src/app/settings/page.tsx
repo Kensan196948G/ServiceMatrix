@@ -3,7 +3,7 @@
  */
 "use client";
 
-import { Settings, Users, Bell, Shield, Database, Palette } from "lucide-react";
+import { Settings, Users, Bell, Shield, Database, Palette, HardDrive, Plug } from "lucide-react";
 import Link from "next/link";
 
 const settingsCategories = [
@@ -40,6 +40,14 @@ const settingsCategories = [
     bg: "bg-green-50",
   },
   {
+    icon: HardDrive,
+    label: "バックアップ管理",
+    description: "データベースバックアップの作成・ダウンロード・削除",
+    href: "/settings/backup",
+    color: "text-teal-600",
+    bg: "bg-teal-50",
+  },
+  {
     icon: Palette,
     label: "外観設定",
     description: "テーマ・フォント・レイアウト密度の設定",
@@ -52,6 +60,14 @@ const settingsCategories = [
     label: "システム全般",
     description: "APIキー・Webhook・統合設定",
     href: "/settings/general",
+  },
+  {
+    icon: Plug,
+    label: "外部統合",
+    description: "Jira・ServiceNow との統合設定",
+    href: "/settings/integrations",
+    color: "text-indigo-600",
+    bg: "bg-indigo-50",
   },
 ];
 

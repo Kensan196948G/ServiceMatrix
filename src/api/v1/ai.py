@@ -3,13 +3,17 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.database import get_db
 from src.middleware.rbac import get_current_user
+from src.models.incident import Incident
+from src.models.problem import Problem
 from src.models.user import User
 from src.services.agent_orchestrator import orchestrator
 from src.services.ai_decision_log_service import AIDecision, ai_decision_log_service
+from src.services.ai_service import ai_service
 from src.services.ai_triage_service import ai_triage_service
 from src.services.auto_repair_service import auto_repair_service
 from src.services.change_impact_service import change_impact_service
@@ -255,3 +259,103 @@ async def orchestrate_incident(
         "total_confidence": team_result.total_confidence,
         "executed_at": team_result.executed_at,
     }
+
+
+# ─── Step27: GPT-4/Claude AI強化エンドポイント ────────────────────────────
+
+
+@router.get(
+    "/status",
+    summary="AI設定ステータス確認",
+)
+async def ai_status(
+    current_user: Annotated[User, Depends(get_current_user)],
+) -> dict:
+    """AI設定ステータス（プロバイダー・モデル・設定済みか）"""
+    return {
+        "provider": ai_service.provider,
+        "model": ai_service.model,
+        "configured": bool(ai_service.api_key),
+        "mode": "mock" if (ai_service.provider == "mock" or not ai_service.api_key) else "live",
+    }
+
+
+@router.post(
+    "/incidents/{incident_id}/summarize",
+    summary="インシデント要約生成",
+    status_code=status.HTTP_200_OK,
+)
+async def summarize_incident(
+    incident_id: str,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+) -> dict:
+    """インシデントの内容をAIで要約する"""
+    result = await db.execute(select(Incident).where(Incident.incident_id == incident_id))
+    incident = result.scalar_one_or_none()
+    if not incident:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="インシデントが見つかりません"
+        )
+
+    summary = await ai_service.summarize_incident(
+        incident_title=incident.title,
+        description=incident.description or "",
+        comments=[],
+    )
+    return {"incident_id": incident_id, "summary": summary}
+
+
+@router.post(
+    "/incidents/{incident_id}/suggest-priority",
+    summary="インシデント優先度提案",
+    status_code=status.HTTP_200_OK,
+)
+async def suggest_incident_priority(
+    incident_id: str,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+) -> dict:
+    """インシデントの優先度をAIで提案する"""
+    result = await db.execute(select(Incident).where(Incident.incident_id == incident_id))
+    incident = result.scalar_one_or_none()
+    if not incident:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="インシデントが見つかりません"
+        )
+
+    priority = await ai_service.suggest_incident_priority(
+        title=incident.title,
+        description=incident.description or "",
+        affected_service=getattr(incident, "affected_service", None),
+    )
+    return {"incident_id": incident_id, "suggested_priority": priority}
+
+
+@router.post(
+    "/problems/{problem_id}/generate-rca",
+    summary="RCAレポート生成",
+    status_code=status.HTTP_200_OK,
+)
+async def generate_rca_report(
+    problem_id: str,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+) -> dict:
+    """問題の根本原因分析レポートをAIで生成する"""
+    result = await db.execute(select(Problem).where(Problem.problem_id == problem_id))
+    problem = result.scalar_one_or_none()
+    if not problem:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="問題が見つかりません")
+
+    affected_services: list[str] = []
+    affected_service = getattr(problem, "affected_service", None)
+    if affected_service:
+        affected_services = [affected_service]
+
+    rca = await ai_service.generate_rca_report(
+        problem_title=problem.title,
+        affected_services=affected_services,
+        timeline=[],
+    )
+    return {"problem_id": problem_id, **rca}

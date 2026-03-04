@@ -64,6 +64,11 @@ class Settings(BaseSettings):
     security_headers_enabled: bool = True
     allowed_hosts: list[str] = ["localhost", "127.0.0.1", "servicematrix.local"]
 
+    # AI強化設定（外部LLM API）
+    AI_PROVIDER: str = "mock"  # "mock" | "openai" | "anthropic"
+    AI_API_KEY: str = ""  # noqa: S105
+    AI_MODEL: str = "gpt-4o-mini"
+
 
 @lru_cache
 def get_settings() -> Settings:

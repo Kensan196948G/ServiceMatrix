@@ -28,6 +28,7 @@ const pageTitles: Record<string, string> = {
   "/settings/data": "データ管理",
   "/settings/appearance": "外観設定",
   "/settings/general": "システム全般",
+  "/settings/integrations": "外部統合",
   "/profile": "プロフィール",
   "/profile/settings": "個人設定",
   "/reports": "レポート / 分析",
@@ -47,12 +48,11 @@ function resolveTitle(pathname: string): string {
   return match?.[1] ?? "ServiceMatrix";
 }
 
-export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
+export default function Header({ onMenuClick, onSearchClick }: { onMenuClick?: () => void; onSearchClick?: () => void }) {
   const pathname = usePathname();
   const router = useRouter();
   const { user, logout } = useAuthStore();
   const [menuOpen, setMenuOpen] = useState(false);
-  const [searchFocused, setSearchFocused] = useState(false);
 
   const title = resolveTitle(pathname);
 
@@ -82,17 +82,14 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
 
       <div className="flex items-center gap-3">
         {/* 検索バー */}
-        <div className={`flex items-center gap-2 rounded-md border px-3 py-1.5 transition-all ${searchFocused ? "border-blue-400 bg-white shadow-sm w-64" : "border-gray-200 bg-gray-50 w-48"}`}>
-          <Search className="h-3.5 w-3.5 text-gray-400 flex-shrink-0" />
-          <input
-            type="text"
-            placeholder="検索..."
-            onFocus={() => setSearchFocused(true)}
-            onBlur={() => setSearchFocused(false)}
-            className="bg-transparent text-sm text-gray-600 placeholder-gray-400 focus:outline-none w-full"
-          />
-          <kbd className="hidden text-[10px] text-gray-400 sm:inline">/</kbd>
-        </div>
+        <button
+          onClick={onSearchClick}
+          className="flex items-center gap-2 rounded-md border border-gray-200 bg-gray-50 px-3 py-1.5 text-sm text-gray-400 transition-all hover:border-blue-300 hover:bg-white w-48 sm:w-64"
+        >
+          <Search className="h-3.5 w-3.5 flex-shrink-0" />
+          <span className="flex-1 text-left">検索...</span>
+          <kbd className="hidden text-[10px] sm:inline">Ctrl+K</kbd>
+        </button>
 
         {/* 通知パネル */}
         <NotificationPanel />

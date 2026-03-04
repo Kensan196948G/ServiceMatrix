@@ -92,6 +92,13 @@ export default function ProblemDetailPage() {
   // Auto-RCA state
   const [rcaLoading, setRcaLoading] = useState(false);
   const [rcaResult, setRcaResult] = useState<string | null>(null);
+  const [aiRcaLoading, setAiRcaLoading] = useState(false);
+  const [aiRcaReport, setAiRcaReport] = useState<{
+    root_cause: string;
+    contributing_factors: string[];
+    recommendations: string[];
+    prevention_measures: string[];
+  } | null>(null);
 
   const { data: problem, isLoading, isError } = useQuery<Problem>({
     queryKey: ["problem", id],
@@ -171,6 +178,30 @@ export default function ProblemDetailPage() {
       setRcaResult("RCA分析に失敗しました。");
     } finally {
       setRcaLoading(false);
+    }
+  };
+
+  const runAiRca = async () => {
+    if (!id) return;
+    setAiRcaLoading(true);
+    setAiRcaReport(null);
+    try {
+      const res = await apiClient.post(`/ai/problems/${id}/generate-rca`);
+      setAiRcaReport({
+        root_cause: res.data.root_cause,
+        contributing_factors: res.data.contributing_factors ?? [],
+        recommendations: res.data.recommendations ?? [],
+        prevention_measures: res.data.prevention_measures ?? [],
+      });
+    } catch {
+      setAiRcaReport({
+        root_cause: "AI-RCA生成に失敗しました。",
+        contributing_factors: [],
+        recommendations: [],
+        prevention_measures: [],
+      });
+    } finally {
+      setAiRcaLoading(false);
     }
   };
 
@@ -513,6 +544,64 @@ export default function ProblemDetailPage() {
               </button>
             </div>
           </div>
+        )}
+      </div>
+
+      {/* AI-RCA生成 */}
+      <div className="bg-white rounded-xl border border-gray-200 p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="font-semibold text-gray-800 flex items-center gap-2">
+            <Brain className="h-5 w-5 text-purple-500" />
+            AI-RCA生成
+          </h3>
+          <button
+            onClick={runAiRca}
+            disabled={aiRcaLoading}
+            className="flex items-center gap-2 px-3 py-1.5 bg-purple-600 text-white text-xs rounded-lg hover:bg-purple-700 disabled:opacity-50 transition"
+          >
+            {aiRcaLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Brain className="h-3 w-3" />}
+            AI-RCA生成実行
+          </button>
+        </div>
+        {aiRcaReport ? (
+          <div className="space-y-3">
+            <div className="rounded-lg bg-purple-50 border border-purple-200 p-3">
+              <p className="text-xs font-semibold text-purple-700 mb-1">根本原因</p>
+              <p className="text-sm text-purple-900">{aiRcaReport.root_cause}</p>
+            </div>
+            {aiRcaReport.contributing_factors.length > 0 && (
+              <div className="rounded-lg bg-orange-50 border border-orange-200 p-3">
+                <p className="text-xs font-semibold text-orange-700 mb-1">寄与因子</p>
+                <ul className="list-disc list-inside space-y-0.5">
+                  {aiRcaReport.contributing_factors.map((f, i) => (
+                    <li key={i} className="text-sm text-orange-900">{f}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {aiRcaReport.recommendations.length > 0 && (
+              <div className="rounded-lg bg-blue-50 border border-blue-200 p-3">
+                <p className="text-xs font-semibold text-blue-700 mb-1">推奨アクション</p>
+                <ul className="list-disc list-inside space-y-0.5">
+                  {aiRcaReport.recommendations.map((r, i) => (
+                    <li key={i} className="text-sm text-blue-900">{r}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {aiRcaReport.prevention_measures.length > 0 && (
+              <div className="rounded-lg bg-green-50 border border-green-200 p-3">
+                <p className="text-xs font-semibold text-green-700 mb-1">再発防止策</p>
+                <ul className="list-disc list-inside space-y-0.5">
+                  {aiRcaReport.prevention_measures.map((m, i) => (
+                    <li key={i} className="text-sm text-green-900">{m}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        ) : (
+          <p className="text-sm text-gray-400">「AI-RCA生成実行」ボタンで根本原因分析レポートをAIが自動生成します。</p>
         )}
       </div>
 

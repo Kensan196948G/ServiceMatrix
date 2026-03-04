@@ -116,9 +116,7 @@ async def get_change_calendar(
     """承認済み（Approved/Scheduled）変更を日付別グループで返す"""
     try:
         start_dt = datetime.strptime(start_date, "%Y-%m-%d")
-        end_dt = datetime.strptime(end_date, "%Y-%m-%d").replace(
-            hour=23, minute=59, second=59
-        )
+        end_dt = datetime.strptime(end_date, "%Y-%m-%d").replace(hour=23, minute=59, second=59)
     except ValueError:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -127,14 +125,12 @@ async def get_change_calendar(
 
     no_schedule = Change.scheduled_start_at.is_(None)
     in_range_created = (Change.created_at >= start_dt) & (Change.created_at <= end_dt)
-    in_range_scheduled = (
-        (Change.scheduled_start_at >= start_dt) & (Change.scheduled_start_at <= end_dt)
+    in_range_scheduled = (Change.scheduled_start_at >= start_dt) & (
+        Change.scheduled_start_at <= end_dt
     )
     query = (
         select(Change)
-        .where(
-            Change.status.in_(["Approved", "Scheduled", "Draft", "Submitted", "CAB_Review"])
-        )
+        .where(Change.status.in_(["Approved", "Scheduled", "Draft", "Submitted", "CAB_Review"]))
         .where(in_range_scheduled | (no_schedule & in_range_created))
         .order_by(Change.scheduled_start_at.nulls_last(), Change.created_at)
     )
