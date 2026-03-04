@@ -30,9 +30,20 @@ variable "backend_image" {
   type = string
 }
 
-variable "database_url" {
-  type      = string
-  sensitive = true
+variable "database_url_ssm_arn" {
+  description = "SSM Parameter Store ARN for DATABASE_URL (SecureString)"
+  type        = string
+}
+
+variable "certificate_arn" {
+  description = "ACM 証明書 ARN (HTTPS リスナー用)"
+  type        = string
+  default     = ""
+}
+
+variable "ecs_sg_id" {
+  description = "ルートモジュールで作成された ECS タスクセキュリティグループ ID (循環依存回避)"
+  type        = string
 }
 
 variable "tags" {

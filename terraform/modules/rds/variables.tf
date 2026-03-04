@@ -28,6 +28,11 @@ variable "db_password" {
   sensitive = true
 }
 
+variable "ecs_security_group_id" {
+  description = "ECS タスクのセキュリティグループ ID (最小権限アクセス制御)"
+  type        = string
+}
+
 variable "tags" {
   type = map(string)
 }

@@ -85,3 +85,15 @@ variable "db_password" {
   type        = string
   sensitive   = true
 }
+
+variable "db_name" {
+  description = "RDS データベース名"
+  type        = string
+  default     = "servicematrix"
+}
+
+variable "certificate_arn" {
+  description = "HTTPS リスナー用 ACM 証明書 ARN"
+  type        = string
+  default     = ""
+}
