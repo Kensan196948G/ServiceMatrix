@@ -153,6 +153,41 @@ export interface DashboardStats {
   service_requests: number;
 }
 
+// --- CMDB ---
+
+export interface CI {
+  ci_id: string;
+  name: string;
+  ci_type: string;
+  status: string;
+  description?: string;
+  team_id?: string;
+  depends_on?: string[];
+  incident_count?: number;
+  created_at: string;
+  updated_at: string;
+}
+
+// --- 監査ログ ---
+
+export interface AuditLog {
+  audit_id: string;
+  action: string;
+  entity_type: string;
+  entity_id: string;
+  user_id?: string;
+  changes?: Record<string, unknown>;
+  created_at: string;
+  hash: string;
+  prev_hash?: string;
+}
+
+export interface AuditVerifyResult {
+  valid: boolean;
+  total_records: number;
+  violations: number;
+}
+
 /** SLA計測値 */
 export interface SLAMeasurement {
   measurement_id: string;

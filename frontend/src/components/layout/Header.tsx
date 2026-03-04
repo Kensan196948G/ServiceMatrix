@@ -1,22 +1,43 @@
 /**
  * ヘッダーコンポーネント
- * ユーザー情報表示・ログアウトボタンを提供
+ * ユーザー情報表示・ログアウトボタン・通知ベルを提供
  */
 "use client";
 
-import { LogOut, User } from "lucide-react";
+import { Bell, LogOut, User } from "lucide-react";
+import { useCallback, useState } from "react";
 import { useAuthStore } from "@/hooks/useAuth";
+import { useWebSocket } from "@/hooks/useWebSocket";
 
 export default function Header() {
   const { user, logout } = useAuthStore();
+  const [unread, setUnread] = useState(0);
+
+  useWebSocket({
+    channel: "all",
+    onMessage: useCallback(() => setUnread((n) => n + 1), []),
+  });
 
   return (
     <header className="flex h-16 items-center justify-between border-b border-gray-200 bg-white px-6">
       {/* ページタイトル領域 */}
       <div />
 
-      {/* ユーザー情報・ログアウト */}
+      {/* ユーザー情報・通知・ログアウト */}
       <div className="flex items-center gap-4">
+        {/* 通知ベル */}
+        <button
+          onClick={() => setUnread(0)}
+          className="relative rounded-lg p-1.5 text-gray-500 hover:bg-gray-100"
+          aria-label="通知"
+        >
+          <Bell className="h-5 w-5" />
+          {unread > 0 && (
+            <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
+              {unread > 9 ? "9+" : unread}
+            </span>
+          )}
+        </button>
         {user && (
           <div className="flex items-center gap-2 text-sm text-gray-700">
             <User className="h-4 w-4 text-gray-400" />

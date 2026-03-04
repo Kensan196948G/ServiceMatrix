@@ -15,6 +15,8 @@ import {
   Settings,
   ShieldAlert,
   Brain,
+  Database,
+  ScrollText,
   type LucideIcon,
 } from "lucide-react";
 
@@ -38,6 +40,8 @@ const navItems: NavItem[] = [
   },
   { label: "SLA監視", href: "/sla", icon: ShieldAlert },
   { label: "AI分析", href: "/ai", icon: Brain },
+  { label: "CMDB管理", href: "/cmdb", icon: Database },
+  { label: "監査ログ", href: "/audit-logs", icon: ScrollText },
 ];
 
 export default function Sidebar() {

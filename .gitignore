@@ -60,6 +60,8 @@ build/
 secrets/
 .secrets/
 credentials.json
+.env.prod
+*.env
 
 # Test coverage
 coverage/

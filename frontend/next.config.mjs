@@ -1,5 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  output: 'standalone',
   // バックエンドAPIへのプロキシ設定
   async rewrites() {
     return [
