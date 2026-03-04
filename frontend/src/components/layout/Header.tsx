@@ -6,7 +6,7 @@
 
 import { useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { Bell, Search, LogOut, User, Settings, ChevronDown } from "lucide-react";
+import { Bell, Search, LogOut, User, Settings, ChevronDown, Menu } from "lucide-react";
 import { useAuthStore } from "@/hooks/useAuth";
 import NotificationPanel from "@/components/layout/NotificationPanel";
 
@@ -30,6 +30,7 @@ const pageTitles: Record<string, string> = {
   "/settings/general": "システム全般",
   "/profile": "プロフィール",
   "/profile/settings": "個人設定",
+  "/reports": "レポート / 分析",
 };
 
 // 動的ルートのタイトル解決
@@ -46,7 +47,7 @@ function resolveTitle(pathname: string): string {
   return match?.[1] ?? "ServiceMatrix";
 }
 
-export default function Header() {
+export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
   const pathname = usePathname();
   const router = useRouter();
   const { user, logout } = useAuthStore();
@@ -65,9 +66,17 @@ export default function Header() {
   };
 
   return (
-    <header className="flex h-14 items-center justify-between border-b border-gray-200 bg-white px-6 flex-shrink-0">
+    <header className="flex h-14 items-center justify-between border-b border-gray-200 bg-white px-4 sm:px-6 flex-shrink-0">
       {/* ページタイトル */}
       <div className="flex items-center gap-2">
+        {/* モバイル: ハンバーガーメニュー */}
+        <button
+          onClick={onMenuClick}
+          className="md:hidden rounded-md p-1.5 text-gray-500 hover:bg-gray-100"
+          aria-label="メニューを開く"
+        >
+          <Menu className="h-5 w-5" />
+        </button>
         <h1 className="text-base font-semibold text-gray-800">{title}</h1>
       </div>
 

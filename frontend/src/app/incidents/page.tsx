@@ -195,7 +195,7 @@ export default function IncidentsPage() {
   return (
     <div className="space-y-4">
       {/* ページヘッダー */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2">
             <AlertTriangle className="h-5 w-5 text-red-500" />
@@ -334,8 +334,8 @@ export default function IncidentsPage() {
               </div>
             )}
 
-            {/* テーブルヘッダー */}
-            <div className="grid grid-cols-[32px_140px_1fr_90px_130px_90px_110px_80px] gap-3 border-b border-gray-100 bg-gray-50 px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-gray-500">
+            {/* デスクトップ: テーブルヘッダー */}
+            <div className="hidden sm:grid grid-cols-[32px_140px_1fr_90px_130px_90px_110px_80px] gap-3 border-b border-gray-100 bg-gray-50 px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-gray-500">
               <span>
                 <button onClick={toggleAll} className="text-gray-400 hover:text-gray-700">
                   {allSelected ? <CheckSquare className="h-4 w-4 text-blue-600" /> : <Square className="h-4 w-4" />}
@@ -350,63 +350,104 @@ export default function IncidentsPage() {
               <span></span>
             </div>
 
-            {/* テーブル行 */}
-            {incidents.map((incident) => (
-              <div
-                key={incident.incident_id}
-                className={`grid grid-cols-[32px_140px_1fr_90px_130px_90px_110px_80px] gap-3 items-center border-b border-gray-50 px-4 py-3 hover:bg-blue-50/40 transition-colors last:border-0 ${selectedIds.has(incident.incident_id) ? "bg-blue-50/60" : ""}`}
-              >
-                <span>
-                  <button
-                    onClick={e => { e.preventDefault(); toggleOne(incident.incident_id); }}
-                    className="text-gray-400 hover:text-blue-600"
-                  >
-                    {selectedIds.has(incident.incident_id)
-                      ? <CheckSquare className="h-4 w-4 text-blue-600" />
-                      : <Square className="h-4 w-4" />}
-                  </button>
-                </span>
-                <span className="font-mono text-xs text-gray-500">{incident.incident_number}</span>
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-medium text-gray-800">{incident.title}</p>
-                  {incident.affected_service && (
-                    <p className="truncate text-xs text-gray-400">{incident.affected_service}</p>
-                  )}
-                </div>
-                <span>
-                  <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${priorityBadgeStyle[incident.priority] ?? "bg-gray-100 text-gray-600"}`}>
-                    {incident.priority}
+            {/* デスクトップ: テーブル行 */}
+            <div className="hidden sm:block">
+              {incidents.map((incident) => (
+                <div
+                  key={incident.incident_id}
+                  className={`grid grid-cols-[32px_140px_1fr_90px_130px_90px_110px_80px] gap-3 items-center border-b border-gray-50 px-4 py-3 hover:bg-blue-50/40 transition-colors last:border-0 ${selectedIds.has(incident.incident_id) ? "bg-blue-50/60" : ""}`}
+                >
+                  <span>
+                    <button
+                      onClick={e => { e.preventDefault(); toggleOne(incident.incident_id); }}
+                      className="text-gray-400 hover:text-blue-600"
+                    >
+                      {selectedIds.has(incident.incident_id)
+                        ? <CheckSquare className="h-4 w-4 text-blue-600" />
+                        : <Square className="h-4 w-4" />}
+                    </button>
                   </span>
-                </span>
-                <span>
-                  <Badge variant={getStatusVariant(incident.status)}>
-                    {incident.status.replace(/_/g, " ")}
-                  </Badge>
-                </span>
-                <span>
-                  {incident.sla_breached ? (
-                    <span className="flex items-center gap-1 text-xs text-red-600 font-medium">
-                      <XCircle className="h-3.5 w-3.5" /> 超過
+                  <span className="font-mono text-xs text-gray-500">{incident.incident_number}</span>
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium text-gray-800">{incident.title}</p>
+                    {incident.affected_service && (
+                      <p className="truncate text-xs text-gray-400">{incident.affected_service}</p>
+                    )}
+                  </div>
+                  <span>
+                    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${priorityBadgeStyle[incident.priority] ?? "bg-gray-100 text-gray-600"}`}>
+                      {incident.priority}
                     </span>
-                  ) : (
-                    <span className="flex items-center gap-1 text-xs text-green-600">
-                      <Clock className="h-3.5 w-3.5" /> 遵守
-                    </span>
+                  </span>
+                  <span>
+                    <Badge variant={getStatusVariant(incident.status)}>
+                      {incident.status.replace(/_/g, " ")}
+                    </Badge>
+                  </span>
+                  <span>
+                    {incident.sla_breached ? (
+                      <span className="flex items-center gap-1 text-xs text-red-600 font-medium">
+                        <XCircle className="h-3.5 w-3.5" /> 超過
+                      </span>
+                    ) : (
+                      <span className="flex items-center gap-1 text-xs text-green-600">
+                        <Clock className="h-3.5 w-3.5" /> 遵守
+                      </span>
+                    )}
+                  </span>
+                  <span className="text-xs text-gray-400">
+                    {new Date(incident.created_at).toLocaleDateString("ja-JP", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+                  </span>
+                  <span>
+                    <Link
+                      href={`/incidents/${incident.incident_id}`}
+                      className="text-xs text-blue-600 hover:text-blue-800 hover:underline font-medium"
+                    >
+                      詳細を見る
+                    </Link>
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            {/* モバイル: カードグリッド */}
+            <div className="sm:hidden divide-y divide-gray-100">
+              {incidents.map((incident) => (
+                <Link
+                  key={incident.incident_id}
+                  href={`/incidents/${incident.incident_id}`}
+                  className={`block p-4 hover:bg-blue-50/40 transition-colors ${selectedIds.has(incident.incident_id) ? "bg-blue-50/60" : ""}`}
+                >
+                  <div className="flex items-start justify-between gap-2 mb-2">
+                    <span className="font-mono text-xs text-gray-400">{incident.incident_number}</span>
+                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                      <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${priorityBadgeStyle[incident.priority] ?? "bg-gray-100 text-gray-600"}`}>
+                        {incident.priority}
+                      </span>
+                      <Badge variant={getStatusVariant(incident.status)}>
+                        {incident.status.replace(/_/g, " ")}
+                      </Badge>
+                    </div>
+                  </div>
+                  <p className="text-sm font-medium text-gray-800 line-clamp-2 mb-1">{incident.title}</p>
+                  {incident.affected_service && (
+                    <p className="text-xs text-gray-400 truncate mb-2">{incident.affected_service}</p>
                   )}
-                </span>
-                <span className="text-xs text-gray-400">
-                  {new Date(incident.created_at).toLocaleDateString("ja-JP", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
-                </span>
-                <span>
-                  <Link
-                    href={`/incidents/${incident.incident_id}`}
-                    className="text-xs text-blue-600 hover:text-blue-800 hover:underline font-medium"
-                  >
-                    詳細を見る
-                  </Link>
-                </span>
-              </div>
-            ))}
+                  <div className="flex items-center justify-between text-xs text-gray-400">
+                    <span>{new Date(incident.created_at).toLocaleDateString("ja-JP", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}</span>
+                    {incident.sla_breached ? (
+                      <span className="flex items-center gap-1 text-red-600 font-medium">
+                        <XCircle className="h-3.5 w-3.5" /> SLA超過
+                      </span>
+                    ) : (
+                      <span className="flex items-center gap-1 text-green-600">
+                        <Clock className="h-3.5 w-3.5" /> SLA遵守
+                      </span>
+                    )}
+                  </div>
+                </Link>
+              ))}
+            </div>
           </>
         )}
       </div>

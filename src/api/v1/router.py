@@ -12,6 +12,8 @@ from src.api.v1.health import router as health_router
 from src.api.v1.incidents import router as incidents_router
 from src.api.v1.notifications import router as notifications_router
 from src.api.v1.problems import router as problems_router
+from src.api.v1.reports import router as reports_router
+from src.api.v1.service_catalog import router as service_catalog_router
 from src.api.v1.service_requests import router as service_requests_router
 from src.api.v1.sla import router as sla_router
 from src.api.v1.webhooks import router as webhooks_router
@@ -25,6 +27,7 @@ api_router.include_router(changes_router)
 api_router.include_router(problems_router)
 api_router.include_router(cmdb_router)
 api_router.include_router(service_requests_router)
+api_router.include_router(service_catalog_router)
 api_router.include_router(sla_router)
 api_router.include_router(webhooks_router)
 api_router.include_router(audit_router)
@@ -32,3 +35,4 @@ api_router.include_router(ai_router)
 api_router.include_router(websocket_router)
 api_router.include_router(notifications_router)
 api_router.include_router(dashboard_router)
+api_router.include_router(reports_router)
