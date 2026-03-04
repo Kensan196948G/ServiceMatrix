@@ -30,8 +30,6 @@ class TestDatabaseConfig:
             },
             clear=False,
         ):
-            from pydantic_settings import BaseSettings
-
             # キャッシュを回避するため直接インスタンス化
             from src.core.config import Settings
 
@@ -52,7 +50,7 @@ class TestDatabaseConfig:
             postgres_port=5433,
             postgres_db="mydb",
             postgres_user="myuser",
-            postgres_password="mypass",
+            postgres_password="mypass",  # noqa: S106
         )
         url = s.get_database_url()
         assert url == "postgresql+asyncpg://myuser:mypass@db.example.com:5433/mydb"
