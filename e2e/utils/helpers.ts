@@ -1,8 +1,8 @@
 import { Page, expect } from '@playwright/test';
 
 export const TEST_USER = {
-  username: 'admin',
-  password: 'Admin1234!',
+  username: process.env.TEST_E2E_USERNAME || 'admin',
+  password: process.env.TEST_E2E_PASSWORD || 'Admin1234!',
 };
 
 export const API_BASE = process.env.API_BASE_URL || 'http://localhost:8000';
@@ -12,7 +12,7 @@ export const API_BASE = process.env.API_BASE_URL || 'http://localhost:8000';
  */
 export async function login(page: Page, username = TEST_USER.username, password = TEST_USER.password): Promise<void> {
   await page.goto('/login');
-  await page.waitForLoadState('networkidle');
+  await page.waitForLoadState('domcontentloaded');
 
   const usernameInput = page.getByLabel(/ユーザー名|username/i).or(page.locator('input[name="username"]'));
   const passwordInput = page.getByLabel(/パスワード|password/i).or(page.locator('input[type="password"]'));
@@ -21,7 +21,7 @@ export async function login(page: Page, username = TEST_USER.username, password 
   await passwordInput.fill(password);
 
   await page.getByRole('button', { name: /ログイン|login|sign in/i }).click();
-  await page.waitForLoadState('networkidle');
+  await page.waitForLoadState('domcontentloaded');
 }
 
 /**

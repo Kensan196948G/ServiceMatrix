@@ -45,6 +45,19 @@ jobs:
           npm install
           npx playwright install --with-deps chromium
 
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Start frontend
+        working-directory: frontend
+        run: |
+          npm run build
+          npm run start &
+          npx wait-on http://localhost:3000 --timeout 60000
+        env:
+          NEXT_PUBLIC_API_URL: http://localhost:8000
+
       - name: Run E2E tests
         working-directory: e2e
         run: npx playwright test --project=chromium
@@ -52,6 +65,8 @@ jobs:
           BASE_URL: http://localhost:3000
           API_BASE_URL: http://localhost:8000
           SKIP_WEB_SERVER: "true"
+          TEST_E2E_USERNAME: ${{ secrets.TEST_E2E_USERNAME || 'admin' }}
+          TEST_E2E_PASSWORD: ${{ secrets.TEST_E2E_PASSWORD || 'Admin1234!' }}
 
       - name: Upload test report
         uses: actions/upload-artifact@v4
