@@ -19,8 +19,31 @@ class Settings(BaseSettings):
     debug: bool = False
     log_level: str = "INFO"
 
-    # データベース
-    database_url: str = "postgresql+asyncpg://servicematrix:password@localhost:5432/servicematrix"
+    # データベース（デフォルトはSQLite、PostgreSQL環境変数が揃えばPostgreSQLを使用）
+    database_url: str = "sqlite+aiosqlite:///./servicematrix.db"
+
+    # PostgreSQL個別設定（環境変数で指定時にdatabase_urlを上書き）
+    postgres_host: str = ""
+    postgres_port: int = 5432
+    postgres_db: str = "servicematrix"
+    postgres_user: str = "servicematrix"
+    postgres_password: str = ""  # noqa: S105
+
+    def get_database_url(self) -> str:
+        """環境に応じたデータベースURLを返す。
+
+        DATABASE_URLが明示的にpostgresqlで始まる場合はそのまま返す。
+        POSTGRES_HOSTが設定されている場合はPostgreSQL URLを組み立てる。
+        それ以外はデフォルトのSQLiteを返す。
+        """
+        if self.database_url.startswith("postgresql"):
+            return self.database_url
+        if self.postgres_host:
+            return (
+                f"postgresql+asyncpg://{self.postgres_user}:{self.postgres_password}"
+                f"@{self.postgres_host}:{self.postgres_port}/{self.postgres_db}"
+            )
+        return self.database_url
 
     # Redis
     redis_url: str = "redis://localhost:6379/0"

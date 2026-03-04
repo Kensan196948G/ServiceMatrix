@@ -12,7 +12,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U servicematrix"]
+      test: ["CMD-SHELL", "pg_isready -U servicematrix -d servicematrix"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -44,6 +44,18 @@ services:
     volumes:
       - .:/app
     command: uvicorn src.main:app --host 0.0.0.0 --port 8000 --reload
+
+  # Alembicマイグレーション実行用ワンショットサービス
+  migrate:
+    build: .
+    environment:
+      DATABASE_URL: postgresql+asyncpg://servicematrix:changeme_dev_only@db:5432/servicematrix
+    depends_on:
+      db:
+        condition: service_healthy
+    command: alembic upgrade head
+    profiles:
+      - tools
 
 volumes:
   postgres_data:
