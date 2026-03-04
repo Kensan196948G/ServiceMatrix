@@ -6,7 +6,7 @@
 
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ChevronLeft, ChevronRight, ShieldCheck, ShieldX } from "lucide-react";
+import { ChevronLeft, ChevronRight, ShieldCheck, ShieldX, Download } from "lucide-react";
 import apiClient from "@/lib/api";
 import Table from "@/components/ui/Table";
 import Badge from "@/components/ui/Badge";
@@ -111,6 +111,38 @@ export default function AuditLogsPage() {
     setSkip(0);
   };
 
+  const exportCSV = () => {
+    if (!logs.length) return;
+    const headers = ["操作タイプ", "エンティティ種別", "エンティティID", "操作者", "日時", "ハッシュ"];
+    const rows = logs.map(l => [
+      l.action,
+      l.entity_type,
+      l.entity_id,
+      l.user_id ?? "",
+      new Date(l.created_at).toLocaleString("ja-JP"),
+      l.hash,
+    ]);
+    const csv = [headers, ...rows].map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(",")).join("\n");
+    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `audit-logs-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const exportJSON = () => {
+    if (!logs.length) return;
+    const blob = new Blob([JSON.stringify(logs, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `audit-logs-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div>
       <div className="mb-6 flex items-center justify-between">
@@ -135,6 +167,26 @@ export default function AuditLogsPage() {
                 : `整合性エラー (${verifyData.violations}件違反)`}
             </div>
           )}
+          <div className="flex items-center gap-1">
+            <button
+              onClick={exportCSV}
+              disabled={!logs.length}
+              className="flex items-center gap-1.5 rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+              title="CSVエクスポート"
+            >
+              <Download className="h-4 w-4" />
+              CSV
+            </button>
+            <button
+              onClick={exportJSON}
+              disabled={!logs.length}
+              className="flex items-center gap-1.5 rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+              title="JSONエクスポート"
+            >
+              <Download className="h-4 w-4" />
+              JSON
+            </button>
+          </div>
           <span className="text-sm text-gray-500">{total} 件</span>
         </div>
       </div>

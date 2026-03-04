@@ -7,7 +7,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus, Filter, RefreshCw, AlertTriangle, Clock, CheckCircle2, XCircle } from "lucide-react";
+import { Plus, Filter, RefreshCw, AlertTriangle, Clock, CheckCircle2, XCircle, CheckSquare, Square } from "lucide-react";
 import apiClient from "@/lib/api";
 import Badge, { getPriorityVariant, getStatusVariant } from "@/components/ui/Badge";
 import LoadingSpinner from "@/components/ui/LoadingSpinner";
@@ -60,6 +60,8 @@ export default function IncidentsPage() {
     title: "", description: "", priority: "P3", category: "", affected_service: "",
   });
   const [formError, setFormError] = useState("");
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkStatus, setBulkStatus] = useState("");
 
   const queryKey = ["incidents", page, filterStatus, filterPriority];
   const { data, isLoading, error, refetch } = useQuery({
@@ -90,6 +92,37 @@ export default function IncidentsPage() {
   const incidents: IncidentResponse[] = data?.items ?? [];
   const total = data?.total ?? 0;
   const totalPages = Math.ceil(total / PAGE_SIZE);
+
+  const allSelected = incidents.length > 0 && incidents.every(i => selectedIds.has(i.incident_id));
+  const toggleAll = () => {
+    if (allSelected) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(incidents.map(i => i.incident_id)));
+    }
+  };
+  const toggleOne = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const bulkTransitionMutation = useMutation({
+    mutationFn: async (newStatus: string) => {
+      await Promise.all(
+        Array.from(selectedIds).map(id =>
+          apiClient.post(`/incidents/${id}/transitions`, { new_status: newStatus })
+        )
+      );
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["incidents"] });
+      setSelectedIds(new Set());
+      setBulkStatus("");
+    },
+  });
 
   const handleCreate = () => {
     if (!form.title.trim()) { setFormError("タイトルは必須です"); return; }
@@ -182,8 +215,44 @@ export default function IncidentsPage() {
           </div>
         ) : (
           <>
+            {/* 一括操作バー */}
+            {selectedIds.size > 0 && (
+              <div className="flex items-center gap-3 bg-blue-50 border-b border-blue-200 px-4 py-2.5">
+                <span className="text-sm font-medium text-blue-700">{selectedIds.size}件選択中</span>
+                <select
+                  value={bulkStatus}
+                  onChange={e => setBulkStatus(e.target.value)}
+                  className="rounded border border-blue-300 px-2 py-1 text-xs text-blue-800 bg-white"
+                >
+                  <option value="">ステータスを変更...</option>
+                  <option value="Acknowledged">Acknowledged</option>
+                  <option value="In_Progress">In Progress</option>
+                  <option value="Resolved">Resolved</option>
+                  <option value="Closed">Closed</option>
+                </select>
+                <button
+                  disabled={!bulkStatus || bulkTransitionMutation.isPending}
+                  onClick={() => bulkTransitionMutation.mutate(bulkStatus)}
+                  className="px-3 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 disabled:opacity-50"
+                >
+                  {bulkTransitionMutation.isPending ? "処理中..." : "一括変更"}
+                </button>
+                <button
+                  onClick={() => setSelectedIds(new Set())}
+                  className="px-3 py-1 text-blue-600 text-xs hover:underline"
+                >
+                  選択解除
+                </button>
+              </div>
+            )}
+
             {/* テーブルヘッダー */}
-            <div className="grid grid-cols-[140px_1fr_90px_130px_90px_110px_80px] gap-3 border-b border-gray-100 bg-gray-50 px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-gray-500">
+            <div className="grid grid-cols-[32px_140px_1fr_90px_130px_90px_110px_80px] gap-3 border-b border-gray-100 bg-gray-50 px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-gray-500">
+              <span>
+                <button onClick={toggleAll} className="text-gray-400 hover:text-gray-700">
+                  {allSelected ? <CheckSquare className="h-4 w-4 text-blue-600" /> : <Square className="h-4 w-4" />}
+                </button>
+              </span>
               <span>番号</span>
               <span>タイトル</span>
               <span>優先度</span>
@@ -197,8 +266,18 @@ export default function IncidentsPage() {
             {incidents.map((incident) => (
               <div
                 key={incident.incident_id}
-                className="grid grid-cols-[140px_1fr_90px_130px_90px_110px_80px] gap-3 items-center border-b border-gray-50 px-4 py-3 hover:bg-blue-50/40 transition-colors last:border-0"
+                className={`grid grid-cols-[32px_140px_1fr_90px_130px_90px_110px_80px] gap-3 items-center border-b border-gray-50 px-4 py-3 hover:bg-blue-50/40 transition-colors last:border-0 ${selectedIds.has(incident.incident_id) ? "bg-blue-50/60" : ""}`}
               >
+                <span>
+                  <button
+                    onClick={e => { e.preventDefault(); toggleOne(incident.incident_id); }}
+                    className="text-gray-400 hover:text-blue-600"
+                  >
+                    {selectedIds.has(incident.incident_id)
+                      ? <CheckSquare className="h-4 w-4 text-blue-600" />
+                      : <Square className="h-4 w-4" />}
+                  </button>
+                </span>
                 <span className="font-mono text-xs text-gray-500">{incident.incident_number}</span>
                 <div className="min-w-0">
                   <p className="truncate text-sm font-medium text-gray-800">{incident.title}</p>

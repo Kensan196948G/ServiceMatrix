@@ -23,6 +23,7 @@ from src.schemas.change_risk import RiskAssessmentResultSchema
 from src.schemas.common import PaginatedResponse
 from src.services import change_service
 from src.services.change_risk_service import change_risk_service
+from src.services.notification_manager import manager as ws_manager
 
 router = APIRouter(prefix="/changes", tags=["changes"])
 
@@ -82,6 +83,10 @@ async def create_change(
     change_data = data.model_dump(exclude_none=True)
     change_data["requested_by"] = current_user.user_id
     change = await change_service.create_change(db, change_data)
+    await ws_manager.broadcast(
+        {"type": "change_created", "change_id": str(change.change_id), "change_number": change.change_number},
+        channel="changes",
+    )
     return change
 
 
@@ -216,6 +221,10 @@ async def transition_change_status(
         change = await change_service.transition_change_status(db, change, transition.new_status)
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e)) from e
+    await ws_manager.broadcast(
+        {"type": "change_update", "action": "transition", "change_id": str(change.change_id), "new_status": change.status},
+        channel="changes",
+    )
     return change
 
 
@@ -245,6 +254,10 @@ async def cab_approval(
         )
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e)) from e
+    await ws_manager.broadcast(
+        {"type": "change_update", "action": "cab_decision", "change_id": str(change.change_id), "approved": approval.approved, "new_status": change.status},
+        channel="changes",
+    )
     return change
 
 
