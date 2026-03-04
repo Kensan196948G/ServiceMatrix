@@ -45,5 +45,28 @@ services:
       - .:/app
     command: uvicorn src.main:app --host 0.0.0.0 --port 8000 --reload
 
+  celery-worker:
+    build: .
+    command: celery -A src.worker.celery_app worker --loglevel=info --concurrency=4
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - DATABASE_URL=${DATABASE_URL:-sqlite+aiosqlite:///./servicematrix.db}
+    depends_on:
+      redis:
+        condition: service_healthy
+    volumes:
+      - .:/app
+
+  celery-beat:
+    build: .
+    command: celery -A src.worker.celery_app beat --loglevel=info
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      redis:
+        condition: service_healthy
+    volumes:
+      - .:/app
+
 volumes:
   postgres_data:
