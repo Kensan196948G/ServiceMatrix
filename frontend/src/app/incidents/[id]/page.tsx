@@ -120,6 +120,8 @@ export default function IncidentDetailPage() {
   const [showSuggestModal, setShowSuggestModal] = useState(false);
   const [suggestions, setSuggestions] = useState<ProblemSuggestion[]>([]);
   const [suggestLoading, setSuggestLoading] = useState(false);
+  const [aiSummary, setAiSummary] = useState<string | null>(null);
+  const [aiSummaryLoading, setAiSummaryLoading] = useState(false);
 
   const { data: incident, isLoading, error } = useQuery<IncidentResponse>({
     queryKey: ["incident", id],
@@ -184,8 +186,21 @@ export default function IncidentDetailPage() {
     }
   };
 
+  const runAiSummary = async () => {
+    if (!id) return;
+    setAiSummaryLoading(true);
+    setAiSummary(null);
+    try {
+      const res = await apiClient.post(`/ai/incidents/${id}/summarize`);
+      setAiSummary(res.data.summary);
+    } catch {
+      setAiSummary("AI要約の生成に失敗しました。");
+    } finally {
+      setAiSummaryLoading(false);
+    }
+  };
+
   const openSuggestModal = async () => {
-    setShowSuggestModal(true);
     setSuggestLoading(true);
     try {
       const res = await apiClient.get<{ suggestions: ProblemSuggestion[] }>(
@@ -400,6 +415,31 @@ export default function IncidentDetailPage() {
               </div>
             ) : (
               <p className="text-sm text-gray-400">AIトリアージ未実行。「AI分析実行」ボタンで自動分析を開始できます。</p>
+            )}
+          </div>
+
+          {/* AI要約 */}
+          <div className="bg-white rounded-lg border border-gray-200 p-5">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-semibold text-gray-900 flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-indigo-500" />
+                AI要約
+              </h2>
+              <button
+                onClick={runAiSummary}
+                disabled={aiSummaryLoading}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 text-white text-xs rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition"
+              >
+                {aiSummaryLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
+                要約生成
+              </button>
+            </div>
+            {aiSummary ? (
+              <div className="rounded-lg bg-indigo-50 border border-indigo-200 p-3">
+                <p className="text-sm text-indigo-900 whitespace-pre-line">{aiSummary}</p>
+              </div>
+            ) : (
+              <p className="text-sm text-gray-400">「要約生成」ボタンでインシデントの内容をAIが要約します。</p>
             )}
           </div>
 

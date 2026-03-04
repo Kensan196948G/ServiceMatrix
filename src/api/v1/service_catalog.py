@@ -41,9 +41,7 @@ async def get_service_catalog(
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     """サービスカタログ詳細取得"""
-    result = await db.execute(
-        select(ServiceCatalog).where(ServiceCatalog.catalog_id == catalog_id)
-    )
+    result = await db.execute(select(ServiceCatalog).where(ServiceCatalog.catalog_id == catalog_id))
     catalog = result.scalar_one_or_none()
     if not catalog:
         raise HTTPException(
@@ -74,9 +72,7 @@ async def update_service_catalog(
     current_user: Annotated[User, Depends(require_role(UserRole.SYSTEM_ADMIN))],
 ):
     """サービスカタログ更新（SYSTEM_ADMINのみ）"""
-    result = await db.execute(
-        select(ServiceCatalog).where(ServiceCatalog.catalog_id == catalog_id)
-    )
+    result = await db.execute(select(ServiceCatalog).where(ServiceCatalog.catalog_id == catalog_id))
     catalog = result.scalar_one_or_none()
     if not catalog:
         raise HTTPException(
@@ -96,9 +92,7 @@ async def delete_service_catalog(
     current_user: Annotated[User, Depends(require_role(UserRole.SYSTEM_ADMIN))],
 ):
     """サービスカタログ削除（SYSTEM_ADMINのみ）"""
-    result = await db.execute(
-        select(ServiceCatalog).where(ServiceCatalog.catalog_id == catalog_id)
-    )
+    result = await db.execute(select(ServiceCatalog).where(ServiceCatalog.catalog_id == catalog_id))
     catalog = result.scalar_one_or_none()
     if not catalog:
         raise HTTPException(

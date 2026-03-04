@@ -26,6 +26,9 @@ import {
   ChevronRight,
   CalendarDays,
   BarChart2,
+  Wrench,
+  ShieldCheck,
+  Plug,
   X,
   type LucideIcon,
 } from "lucide-react";
@@ -71,6 +74,8 @@ const navGroups: NavGroup[] = [
       { label: "CMDB管理", href: "/cmdb", icon: Database },
       { label: "監査ログ", href: "/audit-logs", icon: ScrollText },
       { label: "レポート", href: "/reports", icon: BarChart2 },
+      { label: "メンテナンス管理", href: "/maintenance", icon: Wrench },
+      { label: "コンプライアンス", href: "/compliance", icon: ShieldCheck },
     ],
   },
   {
@@ -82,6 +87,7 @@ const navGroups: NavGroup[] = [
       { label: "データ管理", href: "/settings/data", icon: HardDrive },
       { label: "外観設定", href: "/settings/appearance", icon: Palette },
       { label: "システム全般", href: "/settings/general", icon: SlidersHorizontal },
+      { label: "外部統合", href: "/settings/integrations", icon: Plug },
     ],
   },
 ];
