@@ -152,3 +152,15 @@ export interface DashboardStats {
   problems: number;
   service_requests: number;
 }
+
+/** SLA計測値 */
+export interface SLAMeasurement {
+  measurement_id: string;
+  incident_id: string;
+  sla_type: "response" | "resolution";
+  target_minutes: number;
+  actual_minutes: number | null;
+  breached: boolean;
+  measured_at: string;
+  created_at: string;
+}
