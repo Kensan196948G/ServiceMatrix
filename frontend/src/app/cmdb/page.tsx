@@ -47,6 +47,7 @@ export default function CMDBPage() {
   const [search, setSearch] = useState("");
   const [filterType, setFilterType] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
+  const [filterDepartment, setFilterDepartment] = useState("");
   const [selectedCI, setSelectedCI] = useState<CI | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
@@ -113,7 +114,7 @@ export default function CMDBPage() {
   };
 
   const { data, isLoading, error } = useQuery({
-    queryKey: ["cmdb-cis", skip, search, filterType, filterStatus],
+    queryKey: ["cmdb-cis", skip, search, filterType, filterStatus, filterDepartment],
     queryFn: () =>
       apiClient
         .get<PaginatedResponse<CI> | CI[]>("/cmdb/cis", {
@@ -123,6 +124,7 @@ export default function CMDBPage() {
             ...(search && { name: search }),
             ...(filterType && { ci_type: filterType }),
             ...(filterStatus && { status: filterStatus }),
+            ...(filterDepartment && { department: filterDepartment }),
           },
         })
         .then((r) => r.data),
@@ -162,6 +164,11 @@ export default function CMDBPage() {
 
   const handleFilterStatus = (val: string) => {
     setFilterStatus(val);
+    setSkip(0);
+  };
+
+  const handleFilterDepartment = (val: string) => {
+    setFilterDepartment(val);
     setSkip(0);
   };
 
@@ -267,9 +274,19 @@ export default function CMDBPage() {
             <option key={s} value={s}>{s}</option>
           ))}
         </select>
-        {(search || filterType || filterStatus) && (
+        <select
+          value={filterDepartment}
+          onChange={(e) => handleFilterDepartment(e.target.value)}
+          className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
+        >
+          <option value="">全部署</option>
+          {["IT", "HR", "Finance", "Operations", "Development", "Management"].map((d) => (
+            <option key={d} value={d}>{d}</option>
+          ))}
+        </select>
+        {(search || filterType || filterStatus || filterDepartment) && (
           <button
-            onClick={() => { setSearch(""); setFilterType(""); setFilterStatus(""); setSkip(0); }}
+            onClick={() => { setSearch(""); setFilterType(""); setFilterStatus(""); setFilterDepartment(""); setSkip(0); }}
             className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 font-medium px-2"
           >
             <X className="h-3.5 w-3.5" /> フィルタをリセット

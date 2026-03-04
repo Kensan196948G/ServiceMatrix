@@ -6,7 +6,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
-import { Plus, Filter, RefreshCw, GitPullRequest, Shield, AlertTriangle, CheckCircle2, XCircle } from "lucide-react";
+import { Plus, Filter, RefreshCw, GitPullRequest, Shield, AlertTriangle, CheckCircle2, XCircle, CalendarDays } from "lucide-react";
 import apiClient from "@/lib/api";
 import Badge, { getStatusVariant } from "@/components/ui/Badge";
 import LoadingSpinner from "@/components/ui/LoadingSpinner";
@@ -94,9 +94,15 @@ export default function ChangesPage() {
           </h1>
           <p className="text-sm text-gray-500 mt-0.5">全 {total} 件の変更要求</p>
         </div>
-        <Button variant="primary" size="md" icon={<Plus className="h-4 w-4" />} onClick={() => setShowCreate(true)}>
-          新規変更要求
-        </Button>
+        <div className="flex items-center gap-2">
+          <Link href="/changes/calendar" className="inline-flex items-center gap-1.5 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50">
+            <CalendarDays className="h-4 w-4" />
+            カレンダービュー
+          </Link>
+          <Button variant="primary" size="md" icon={<Plus className="h-4 w-4" />} onClick={() => setShowCreate(true)}>
+            新規変更要求
+          </Button>
+        </div>
       </div>
 
       <div className="flex flex-wrap items-center gap-3 rounded-lg border border-gray-200 bg-white p-3 shadow-sm">

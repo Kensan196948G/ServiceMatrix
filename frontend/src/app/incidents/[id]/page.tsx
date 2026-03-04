@@ -5,11 +5,17 @@ import { useParams, useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft, Clock, AlertTriangle, CheckCircle, XCircle,
-  RefreshCw, User, Tag, Calendar, MessageSquare, Send, Brain, Loader2, Sparkles
+  RefreshCw, User, Tag, Calendar, MessageSquare, Send, Brain, Loader2, Sparkles, Link2, X
 } from "lucide-react";
 import apiClient from "@/lib/api";
 import { useAuthStore } from "@/hooks/useAuth";
 import type { IncidentCommentResponse, IncidentResponse } from "@/types/api";
+
+interface ProblemSuggestion {
+  problem_id: string;
+  title: string;
+  similarity_score: number;
+}
 
 const PRIORITY_COLORS: Record<string, string> = {
   P1: "bg-red-100 text-red-800 border-red-200",
@@ -111,6 +117,9 @@ export default function IncidentDetailPage() {
     priority: string; category: string; confidence: number; reasoning: string;
   } | null>(null);
   const [aiTriageLoading, setAiTriageLoading] = useState(false);
+  const [showSuggestModal, setShowSuggestModal] = useState(false);
+  const [suggestions, setSuggestions] = useState<ProblemSuggestion[]>([]);
+  const [suggestLoading, setSuggestLoading] = useState(false);
 
   const { data: incident, isLoading, error } = useQuery<IncidentResponse>({
     queryKey: ["incident", id],
@@ -175,6 +184,30 @@ export default function IncidentDetailPage() {
     }
   };
 
+  const openSuggestModal = async () => {
+    setShowSuggestModal(true);
+    setSuggestLoading(true);
+    try {
+      const res = await apiClient.get<{ suggestions: ProblemSuggestion[] }>(
+        `/incidents/${id}/suggest-problem`
+      );
+      setSuggestions(res.data.suggestions);
+    } catch {
+      setSuggestions([]);
+    } finally {
+      setSuggestLoading(false);
+    }
+  };
+
+  const linkProblemMutation = useMutation({
+    mutationFn: (problem_id: string) =>
+      apiClient.post(`/incidents/${id}/link-problem`, { problem_id }).then((r) => r.data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["incident", id] });
+      setShowSuggestModal(false);
+    },
+  });
+
   if (isLoading) {
     return (
       <div className="flex h-64 items-center justify-center">
@@ -199,6 +232,48 @@ export default function IncidentDetailPage() {
 
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-5">
+      {/* 問題リンク提案モーダル */}
+      {showSuggestModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                <Link2 className="w-5 h-5 text-blue-500" />
+                問題リンク提案
+              </h2>
+              <button onClick={() => setShowSuggestModal(false)}>
+                <X className="w-5 h-5 text-gray-400 hover:text-gray-600" />
+              </button>
+            </div>
+            {suggestLoading ? (
+              <div className="flex justify-center py-8">
+                <Loader2 className="w-6 h-6 animate-spin text-blue-500" />
+              </div>
+            ) : suggestions.length === 0 ? (
+              <p className="text-sm text-gray-500 py-4 text-center">関連する問題が見つかりませんでした</p>
+            ) : (
+              <ul className="space-y-2">
+                {suggestions.map((s) => (
+                  <li key={s.problem_id} className="flex items-center justify-between rounded-lg border border-gray-200 px-4 py-3">
+                    <div>
+                      <p className="text-sm font-medium text-gray-900">{s.title}</p>
+                      <p className="text-xs text-gray-500">類似度: {Math.round(s.similarity_score * 100)}%</p>
+                    </div>
+                    <button
+                      onClick={() => linkProblemMutation.mutate(s.problem_id)}
+                      disabled={linkProblemMutation.isPending}
+                      className="ml-4 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+                    >
+                      リンク
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* ヘッダー */}
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-start gap-3">
@@ -225,8 +300,15 @@ export default function IncidentDetailPage() {
           </div>
         </div>
 
-        {/* 遷移ボタン */}
+        {/* 遷移ボタン + 問題リンク提案 */}
         <div className="flex-shrink-0 flex gap-2">
+          <button
+            onClick={openSuggestModal}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-blue-300 bg-blue-50 text-blue-700 text-sm font-medium hover:bg-blue-100 transition"
+          >
+            <Link2 className="w-4 h-4" />
+            問題リンク提案
+          </button>
           {transitions.map((t) => (
             <button
               key={t.newStatus}

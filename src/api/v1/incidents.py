@@ -3,6 +3,7 @@
 import uuid
 from typing import Annotated
 
+import pydantic
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -12,6 +13,7 @@ from src.core.database import get_db
 from src.middleware.rbac import get_current_user, require_role
 from src.models.incident import Incident
 from src.models.incident_comment import IncidentComment
+from src.models.problem import Problem
 from src.models.user import User, UserRole
 from src.schemas.common import PaginatedResponse
 from src.schemas.incident import (
@@ -44,6 +46,7 @@ async def list_incidents(
     size: int = Query(default=20, ge=1, le=100),
     status_filter: str | None = Query(default=None, alias="status"),
     priority: str | None = Query(default=None),
+    department: str | None = Query(default=None),
 ):
     """インシデント一覧取得（ページネーション）"""
     query = select(Incident)
@@ -51,6 +54,8 @@ async def list_incidents(
         query = query.where(Incident.status == status_filter)
     if priority:
         query = query.where(Incident.priority == priority)
+    if department:
+        query = query.where(Incident.department == department)
 
     total_result = await db.execute(select(func.count()).select_from(query.subquery()))
     total = total_result.scalar_one()
@@ -416,3 +421,102 @@ async def delete_comment(
         )
     await db.delete(comment)
     await db.flush()
+
+
+class LinkProblemRequest(pydantic.BaseModel):
+    problem_id: uuid.UUID
+    note: str | None = None
+
+
+@router.post(
+    "/{incident_id}/link-problem",
+    summary="インシデントに問題をリンク",
+    description="インシデントに既存の問題（Problem）をリンクします。",
+)
+async def link_problem(
+    incident_id: uuid.UUID,
+    body: LinkProblemRequest,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[
+        User,
+        Depends(
+            require_role(
+                UserRole.SYSTEM_ADMIN,
+                UserRole.SERVICE_MANAGER,
+                UserRole.INCIDENT_MANAGER,
+                UserRole.OPERATOR,
+            )
+        ),
+    ],
+) -> dict:
+    """インシデントと問題を関連付ける"""
+    inc_result = await db.execute(select(Incident).where(Incident.incident_id == incident_id))
+    incident = inc_result.scalar_one_or_none()
+    if not incident:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="インシデントが見つかりません"
+        )
+
+    prob_result = await db.execute(select(Problem).where(Problem.problem_id == body.problem_id))
+    problem = prob_result.scalar_one_or_none()
+    if not problem:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="問題が見つかりません")
+
+    incident.linked_problem_id = body.problem_id
+    await db.flush()
+    return {
+        "linked": True,
+        "problem_id": str(body.problem_id),
+        "message": (
+            f"インシデント {incident.incident_number} を問題 {problem.problem_number}"
+            " にリンクしました"
+        ),
+    }
+
+
+@router.get(
+    "/{incident_id}/suggest-problem",
+    summary="関連問題の提案",
+    description="同一サービスを持つインシデントから関連する問題を提案します。",
+)
+async def suggest_problem(
+    incident_id: uuid.UUID,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+) -> dict:
+    """AIリンク提案: 同一サービスの未解決インシデントに関連する問題を提案する"""
+    inc_result = await db.execute(select(Incident).where(Incident.incident_id == incident_id))
+    incident = inc_result.scalar_one_or_none()
+    if not incident:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="インシデントが見つかりません"
+        )
+    prob_result = await db.execute(
+        select(Problem).where(Problem.status.notin_(["Resolved", "Closed"]))
+    )
+    problems = prob_result.scalars().all()
+
+    suggestions = []
+    for problem in problems:
+        score = 0.0
+        # 同一サービスで類似スコア算出
+        if incident.affected_service and problem.title:
+            service = (incident.affected_service or "").lower()
+            if service and service in problem.title.lower():
+                score += 0.5
+            if service and problem.description and service in problem.description.lower():
+                score += 0.3
+        # 同一優先度
+        if incident.priority == problem.priority:
+            score += 0.2
+        if score > 0:
+            suggestions.append(
+                {
+                    "problem_id": str(problem.problem_id),
+                    "title": problem.title,
+                    "similarity_score": round(score, 2),
+                }
+            )
+
+    suggestions.sort(key=lambda x: float(x["similarity_score"]), reverse=True)  # type: ignore[arg-type]
+    return {"suggestions": suggestions[:5]}

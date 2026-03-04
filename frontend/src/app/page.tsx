@@ -3,9 +3,9 @@
  */
 "use client";
 
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   AlertTriangle, GitPullRequest, HelpCircle, ClipboardList,
   ShieldAlert, TrendingUp, Clock, CheckCircle2, XCircle,
@@ -19,6 +19,9 @@ import apiClient from "@/lib/api";
 import { useAuthStore } from "@/hooks/useAuth";
 import Badge, { getPriorityVariant, getStatusVariant } from "@/components/ui/Badge";
 import LoadingSpinner from "@/components/ui/LoadingSpinner";
+import SLAAlertWidget from "@/components/dashboard/SLAAlertWidget";
+import PendingApprovalsWidget from "@/components/dashboard/PendingApprovalsWidget";
+import IncidentSummaryWidget from "@/components/dashboard/IncidentSummaryWidget";
 import type { IncidentResponse, PaginatedResponse } from "@/types/api";
 
 interface DashboardStats {
@@ -40,6 +43,13 @@ const STATUS_COLORS = ["#3b82f6", "#f97316", "#22c55e", "#a855f7", "#6b7280"];
 export default function DashboardPage() {
   const { user } = useAuthStore();
   const queryClient = useQueryClient();
+  const [demoRole, setDemoRole] = useState<string>("VIEWER");
+
+  useEffect(() => {
+    const stored = localStorage.getItem("user_role");
+    if (stored) setDemoRole(stored.toUpperCase());
+    else if (user?.role) setDemoRole((user.role as string).toUpperCase());
+  }, [user]);
 
   // WebSocketでリアルタイム更新（正しいエンドポイント: /api/v1/ws/incidents?token=JWT）
   const invalidateIncidents = useCallback(() => {
@@ -217,6 +227,18 @@ export default function DashboardPage() {
           <div className="hidden sm:flex items-center gap-2 text-sm text-blue-100">
             <Activity className="h-4 w-4" />
             <span>システム正常稼働中</span>
+            <select
+              value={demoRole}
+              onChange={e => { setDemoRole(e.target.value); localStorage.setItem("user_role", e.target.value); }}
+              className="ml-4 rounded bg-blue-500 border border-blue-400 px-2 py-0.5 text-xs text-white focus:outline-none"
+              title="デモ用ロール切り替え"
+            >
+              <option value="VIEWER">VIEWER</option>
+              <option value="OPERATOR">OPERATOR</option>
+              <option value="SERVICE_MANAGER">SERVICE_MANAGER</option>
+              <option value="CHANGE_MANAGER">CHANGE_MANAGER</option>
+              <option value="SYSTEM_ADMIN">SYSTEM_ADMIN</option>
+            </select>
           </div>
         </div>
       </div>
@@ -231,6 +253,48 @@ export default function DashboardPage() {
               SLA監視ダッシュボードで確認 →
             </Link>
           </p>
+        </div>
+      )}
+
+      {/* ロール別ウィジェットセクション */}
+      {(demoRole === "OPERATOR") && (
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          <SLAAlertWidget incidents={incidentItems} />
+          <IncidentSummaryWidget
+            incidents={incidentItems.filter(i => i.assigned_to === user?.user_id)}
+            total={incidentItems.filter(i => i.assigned_to === user?.user_id).length}
+            title="自分担当のインシデント"
+          />
+        </div>
+      )}
+
+      {(demoRole === "SERVICE_MANAGER" || demoRole === "CHANGE_MANAGER") && (
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          <PendingApprovalsWidget changes={changeItems} />
+          <IncidentSummaryWidget incidents={incidentItems} total={stats.incTotal} title="インシデントサマリ" />
+        </div>
+      )}
+
+      {demoRole === "SYSTEM_ADMIN" && (
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+          <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+            <h3 className="text-xs font-semibold text-gray-500 uppercase mb-2">システム全体統計</h3>
+            <div className="space-y-1 text-sm text-gray-700">
+              <p>インシデント総数: <strong>{stats.incTotal}</strong></p>
+              <p>変更総数: <strong>{stats.chgTotal}</strong></p>
+              <p>問題総数: <strong>{stats.probTotal}</strong></p>
+              <p>SR総数: <strong>{stats.srTotal}</strong></p>
+            </div>
+          </div>
+          <IncidentSummaryWidget incidents={incidentItems} total={stats.incTotal} title="全インシデントサマリ" />
+          <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+            <h3 className="text-xs font-semibold text-gray-500 uppercase mb-2">変更・SR サマリ</h3>
+            <div className="space-y-1 text-sm text-gray-700">
+              <p>承認待ち変更: <strong>{stats.chgPending}</strong></p>
+              <p>オープンSR: <strong>{stats.srOpen}</strong></p>
+              <p>未解決問題: <strong>{stats.probOpen}</strong></p>
+            </div>
+          </div>
         </div>
       )}
 

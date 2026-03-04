@@ -159,6 +159,25 @@ function SLAAlertToast({
   );
 }
 
+interface SLAAlertItem {
+  incident_id: string;
+  title: string;
+  sla_remaining_percent: number;
+  priority: string;
+}
+
+function SLAAlertBanner({ alerts }: { alerts: SLAAlertItem[] }) {
+  if (alerts.length === 0) return null;
+  return (
+    <div className="mb-4 flex items-center gap-3 rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-red-800">
+      <AlertCircle className="h-5 w-5 shrink-0 text-red-600" />
+      <span className="font-semibold">
+        SLAアラート: {alerts.length}件のインシデントが期限切れ間近
+      </span>
+    </div>
+  );
+}
+
 export default function SLADashboardPage() {
   const [priorityFilter, setPriorityFilter] = useState<Priority>("ALL");
   const [slaFilter, setSlaFilter] = useState<SLAFilter>("ALL");
@@ -225,6 +244,12 @@ export default function SLADashboardPage() {
     refetchInterval: 30_000,
   });
 
+  const { data: slaAlertItems = [] } = useQuery<SLAAlertItem[]>({
+    queryKey: ["sla-alerts"],
+    queryFn: () => apiClient.get<SLAAlertItem[]>("/sla/alerts").then((r) => r.data),
+    refetchInterval: 60_000,
+  });
+
   useEffect(() => {
     setLastUpdated(new Date());
   }, [data]);
@@ -283,6 +308,9 @@ export default function SLADashboardPage() {
 
   return (
     <div>
+      {/* SLAアラートバナー（/sla/alerts APIから取得） */}
+      <SLAAlertBanner alerts={slaAlertItems} />
+
       {/* SLAリアルタイムアラートトースト */}
       <SLAAlertToast
         alerts={slaAlerts}

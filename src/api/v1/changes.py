@@ -1,7 +1,7 @@
 """変更管理API - CRUD + リスク評価 + CAB承認"""
 
 import uuid
-from datetime import UTC, date
+from datetime import datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -18,6 +18,7 @@ from src.schemas.change import (
     ChangeResponse,
     ChangeStatusTransition,
     ChangeUpdate,
+    RescheduleRequest,
     ScheduleRequest,
 )
 from src.schemas.change_risk import RiskAssessmentResultSchema
@@ -95,62 +96,78 @@ async def create_change(
     return change
 
 
+_STATUS_COLORS = {
+    "Approved": "#3b82f6",
+    "Scheduled": "#8b5cf6",
+}
+
+
 @router.get(
     "/calendar",
     summary="変更カレンダー取得",
-    description="指定期間のスケジュール済み変更一覧を日付でグループ化して返します。",
+    description="指定期間内の承認済み・スケジュール済み変更を日付別にグループ化して返します。",
 )
 async def get_change_calendar(
+    start_date: Annotated[str, Query(description="開始日 YYYY-MM-DD")],
+    end_date: Annotated[str, Query(description="終了日 YYYY-MM-DD")],
     db: Annotated[AsyncSession, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
-    start_date: date = Query(..., description="開始日 YYYY-MM-DD"),
-    end_date: date = Query(..., description="終了日 YYYY-MM-DD"),
 ):
-    """指定期間の変更カレンダー（スケジュール済み変更一覧）"""
-    from datetime import datetime
+    """承認済み（Approved/Scheduled）変更を日付別グループで返す"""
+    try:
+        start_dt = datetime.strptime(start_date, "%Y-%m-%d")
+        end_dt = datetime.strptime(end_date, "%Y-%m-%d").replace(
+            hour=23, minute=59, second=59
+        )
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="日付形式が不正です。YYYY-MM-DD形式で指定してください。",
+        ) from None
 
-    start_dt = datetime(start_date.year, start_date.month, start_date.day, tzinfo=UTC)
-    end_dt = datetime(end_date.year, end_date.month, end_date.day, 23, 59, 59, tzinfo=UTC)
-
+    no_schedule = Change.scheduled_start_at.is_(None)
+    in_range_created = (Change.created_at >= start_dt) & (Change.created_at <= end_dt)
+    in_range_scheduled = (
+        (Change.scheduled_start_at >= start_dt) & (Change.scheduled_start_at <= end_dt)
+    )
     query = (
         select(Change)
         .where(
-            Change.scheduled_start_at >= start_dt,
-            Change.scheduled_start_at <= end_dt,
+            Change.status.in_(["Approved", "Scheduled", "Draft", "Submitted", "CAB_Review"])
         )
-        .order_by(Change.scheduled_start_at)
+        .where(in_range_scheduled | (no_schedule & in_range_created))
+        .order_by(Change.scheduled_start_at.nulls_last(), Change.created_at)
     )
     result = await db.execute(query)
     changes = result.scalars().all()
 
-    # 日付でグループ化
-    grouped: dict[str, list] = {}
+    # 日付別にグループ化
+    events_by_date: dict[str, list[dict]] = {}
     for change in changes:
-        day = change.scheduled_start_at.date().isoformat()
-        if day not in grouped:
-            grouped[day] = []
-        grouped[day].append(
+        start = change.scheduled_start_at or change.created_at
+        date_key = start.strftime("%Y-%m-%d") if start else "unknown"
+        if date_key not in events_by_date:
+            events_by_date[date_key] = []
+        events_by_date[date_key].append(
             {
-                "change_id": str(change.change_id),
-                "change_number": change.change_number,
+                "id": str(change.change_id),
                 "title": change.title,
-                "status": change.status,
+                "change_number": change.change_number,
                 "change_type": change.change_type,
+                "status": change.status,
                 "risk_level": change.risk_level,
-                "scheduled_start_at": change.scheduled_start_at.isoformat(),
-                "scheduled_end_at": change.scheduled_end_at.isoformat()
-                if change.scheduled_end_at
-                else None,
+                "start": start.isoformat() if start else None,
+                "end": change.scheduled_end_at.isoformat() if change.scheduled_end_at else None,
+                "color": _STATUS_COLORS.get(change.status, "#6b7280"),
             }
         )
 
-    events = [{"date": day, "changes": items} for day, items in sorted(grouped.items())]
-
+    events = [{"date": d, "changes": c} for d, c in sorted(events_by_date.items())]
     return {
-        "start_date": start_date.isoformat(),
-        "end_date": end_date.isoformat(),
-        "total": len(changes),
+        "start_date": start_date,
+        "end_date": end_date,
         "events": events,
+        "total": len(changes),
     }
 
 
@@ -198,6 +215,41 @@ async def update_change(
 
     for field, value in data.model_dump(exclude_none=True).items():
         setattr(change, field, value)
+    await db.flush()
+    await db.refresh(change)
+    return change
+
+
+@router.patch(
+    "/{change_id}/reschedule",
+    response_model=ChangeResponse,
+    summary="変更スケジュール変更",
+    description="ドラッグ＆ドロップ後の日付変更。Approvedステータスのみ許可。",
+)
+async def reschedule_change(
+    change_id: uuid.UUID,
+    data: RescheduleRequest,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[
+        User,
+        Depends(
+            require_role(UserRole.SYSTEM_ADMIN, UserRole.SERVICE_MANAGER, UserRole.CHANGE_MANAGER)
+        ),
+    ],
+):
+    """変更スケジュール更新（ドラッグ＆ドロップ用）"""
+    result = await db.execute(select(Change).where(Change.change_id == change_id))
+    change = result.scalar_one_or_none()
+    if not change:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="変更が見つかりません")
+    if change.status not in ("Approved", "Scheduled"):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="ApprovedまたはScheduledステータスの変更のみ再スケジュール可能です",
+        )
+    change.scheduled_start_at = data.scheduled_start
+    if data.scheduled_end is not None:
+        change.scheduled_end_at = data.scheduled_end
     await db.flush()
     await db.refresh(change)
     return change

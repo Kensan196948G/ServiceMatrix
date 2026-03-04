@@ -23,6 +23,7 @@ import {
   Palette,
   SlidersHorizontal,
   ChevronRight,
+  CalendarDays,
   type LucideIcon,
 } from "lucide-react";
 
@@ -48,6 +49,7 @@ const navGroups: NavGroup[] = [
     items: [
       { label: "インシデント", href: "/incidents", icon: AlertTriangle },
       { label: "変更管理", href: "/changes", icon: GitPullRequest },
+      { label: "変更カレンダー", href: "/changes/calendar", icon: CalendarDays },
       { label: "問題管理", href: "/problems", icon: HelpCircle },
       { label: "サービスリクエスト", href: "/service-requests", icon: ClipboardList },
     ],

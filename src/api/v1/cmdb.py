@@ -34,8 +34,9 @@ async def list_cis(
     status_filter: str | None = Query(default=None, alias="status"),
     skip: int = Query(default=0, ge=0),
     limit: int = Query(default=20, ge=1, le=100),
+    department: str | None = Query(default=None),
 ):
-    items, _ = await cmdb_service.get_cis(db, ci_type, status_filter, skip, limit)
+    items, _ = await cmdb_service.get_cis(db, ci_type, status_filter, skip, limit, department)
     return items
 
 

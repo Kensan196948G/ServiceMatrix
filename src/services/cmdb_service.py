@@ -35,12 +35,15 @@ async def get_cis(
     status: str | None,
     skip: int,
     limit: int,
+    department: str | None = None,
 ) -> tuple[list[ConfigurationItem], int]:
     query = select(ConfigurationItem)
     if ci_type:
         query = query.where(ConfigurationItem.ci_type == ci_type)
     if status:
         query = query.where(ConfigurationItem.status == status)
+    if department:
+        query = query.where(ConfigurationItem.department == department)
 
     total_result = await db.execute(select(func.count()).select_from(query.subquery()))
     total = total_result.scalar_one()

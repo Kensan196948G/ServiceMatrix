@@ -35,6 +35,7 @@ class ConfigurationItem(Base, TimestampMixin):
     )
     description: Mapped[str | None] = mapped_column(Text)
     attributes: Mapped[dict | None] = mapped_column(JSON)
+    department: Mapped[str | None] = mapped_column(String(100), nullable=True)
 
     owner: Mapped["User | None"] = relationship(  # noqa: F821
         "User", foreign_keys=[owner_id], lazy="select"
