@@ -8,6 +8,7 @@ import { useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { Bell, Search, LogOut, User, Settings, ChevronDown } from "lucide-react";
 import { useAuthStore } from "@/hooks/useAuth";
+import NotificationPanel from "@/components/layout/NotificationPanel";
 
 const pageTitles: Record<string, string> = {
   "/": "ダッシュボード",
@@ -71,11 +72,8 @@ export default function Header() {
           <kbd className="hidden text-[10px] text-gray-400 sm:inline">/</kbd>
         </div>
 
-        {/* 通知ベル */}
-        <button className="relative rounded-md p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-700">
-          <Bell className="h-4.5 w-4.5" style={{ width: "18px", height: "18px" }} />
-          <span className="absolute right-1.5 top-1.5 flex h-2 w-2 rounded-full bg-red-500 ring-2 ring-white" />
-        </button>
+        {/* 通知パネル */}
+        <NotificationPanel />
 
         {/* ユーザーメニュー */}
         <div className="relative">

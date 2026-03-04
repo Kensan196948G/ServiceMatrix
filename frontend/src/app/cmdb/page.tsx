@@ -5,8 +5,8 @@
 "use client";
 
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { ChevronLeft, ChevronRight, X, Search } from "lucide-react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { ChevronLeft, ChevronRight, X, Search, Plus } from "lucide-react";
 import apiClient from "@/lib/api";
 import Table from "@/components/ui/Table";
 import Badge from "@/components/ui/Badge";
@@ -39,11 +39,43 @@ function getCiStatusVariant(status: string): "success" | "danger" | "warning" | 
 }
 
 export default function CMDBPage() {
+  const queryClient = useQueryClient();
   const [skip, setSkip] = useState(0);
   const [search, setSearch] = useState("");
   const [filterType, setFilterType] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
   const [selectedCI, setSelectedCI] = useState<CI | null>(null);
+  const [showCreate, setShowCreate] = useState(false);
+  const [form, setForm] = useState({ ci_name: "", ci_type: "Server", ci_class: "", version: "", description: "" });
+  const [createError, setCreateError] = useState("");
+
+  const createMutation = useMutation({
+    mutationFn: (data: typeof form) =>
+      apiClient.post("/cmdb/cis", {
+        ci_name: data.ci_name,
+        ci_type: data.ci_type,
+        ci_class: data.ci_class || undefined,
+        version: data.version || undefined,
+        description: data.description || undefined,
+      }).then(r => r.data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["cmdb-cis"] });
+      setShowCreate(false);
+      setForm({ ci_name: "", ci_type: "Server", ci_class: "", version: "", description: "" });
+      setCreateError("");
+    },
+    onError: (err: unknown) => {
+      const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      setCreateError(msg ?? "CI登録に失敗しました");
+    },
+  });
+
+  const handleCreate = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!form.ci_name.trim()) { setCreateError("CI名は必須です"); return; }
+    setCreateError("");
+    createMutation.mutate(form);
+  };
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["cmdb-cis", skip, search, filterType, filterStatus],
@@ -102,7 +134,15 @@ export default function CMDBPage() {
     <div>
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900">CMDB管理</h1>
-        <span className="text-sm text-gray-500">{total} 件</span>
+        <div className="flex items-center gap-3">
+          <span className="text-sm text-gray-500">{total} 件</span>
+          <button
+            onClick={() => setShowCreate(true)}
+            className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 transition"
+          >
+            <Plus className="h-4 w-4" /> 新規CI登録
+          </button>
+        </div>
       </div>
 
       {/* フィルター・検索バー */}
@@ -287,6 +327,89 @@ export default function CMDBPage() {
                 </dd>
               </div>
             </dl>
+          </div>
+        </div>
+      )}
+
+      {/* 新規CI登録モーダル */}
+      {showCreate && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="w-full max-w-lg rounded-xl bg-white shadow-xl mx-4">
+            <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
+              <h2 className="text-base font-semibold text-gray-900">新規CI登録</h2>
+              <button onClick={() => { setShowCreate(false); setCreateError(""); }} className="rounded p-1 text-gray-400 hover:bg-gray-100">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <form onSubmit={handleCreate} className="p-5 space-y-4">
+              {createError && (
+                <div className="rounded-md bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-600">{createError}</div>
+              )}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">CI名 <span className="text-red-500">*</span></label>
+                <input
+                  type="text"
+                  value={form.ci_name}
+                  onChange={(e) => setForm({ ...form, ci_name: e.target.value })}
+                  placeholder="例: web-server-01"
+                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">CIタイプ <span className="text-red-500">*</span></label>
+                  <select
+                    value={form.ci_type}
+                    onChange={(e) => setForm({ ...form, ci_type: e.target.value })}
+                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    {CI_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">CIクラス</label>
+                  <input
+                    type="text"
+                    value={form.ci_class}
+                    onChange={(e) => setForm({ ...form, ci_class: e.target.value })}
+                    placeholder="例: Linux"
+                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">バージョン</label>
+                <input
+                  type="text"
+                  value={form.version}
+                  onChange={(e) => setForm({ ...form, version: e.target.value })}
+                  placeholder="例: 1.0.0"
+                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">説明</label>
+                <textarea
+                  value={form.description}
+                  onChange={(e) => setForm({ ...form, description: e.target.value })}
+                  rows={3}
+                  placeholder="CIの説明を入力..."
+                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                />
+              </div>
+              <div className="flex justify-end gap-3 pt-2">
+                <button type="button" onClick={() => { setShowCreate(false); setCreateError(""); }} className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm hover:bg-gray-50">
+                  キャンセル
+                </button>
+                <button
+                  type="submit"
+                  disabled={createMutation.isPending}
+                  className="px-5 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition"
+                >
+                  {createMutation.isPending ? "登録中..." : "CI登録"}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

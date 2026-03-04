@@ -1,4 +1,4 @@
-"""認証API - /auth/login, /auth/refresh, /auth/me"""
+"""認証API - /auth/login, /auth/refresh, /auth/me, /auth/users"""
 
 import uuid
 from datetime import UTC, datetime
@@ -13,11 +13,12 @@ from src.core.security import (
     create_access_token,
     create_refresh_token,
     decode_token,
+    get_password_hash,
     verify_password,
 )
-from src.middleware.rbac import get_current_user
-from src.models.user import User
-from src.schemas.auth import LoginRequest, RefreshRequest, TokenResponse, UserResponse
+from src.middleware.rbac import get_current_user, require_role
+from src.models.user import User, UserRole
+from src.schemas.auth import LoginRequest, RefreshRequest, TokenResponse, UserCreateRequest, UserResponse
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -91,3 +92,46 @@ async def refresh_token(
 async def get_me(current_user: Annotated[User, Depends(get_current_user)]):
     """カレントユーザー情報取得"""
     return current_user
+
+
+@router.get("/users", response_model=list[UserResponse])
+async def list_users(
+    current_user: Annotated[User, Depends(require_role(UserRole.SYSTEM_ADMIN, UserRole.SERVICE_MANAGER))],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """ユーザー一覧取得（管理者のみ）"""
+    result = await db.execute(select(User).order_by(User.created_at.desc()))
+    return result.scalars().all()
+
+
+@router.post("/users", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
+async def create_user(
+    body: UserCreateRequest,
+    current_user: Annotated[User, Depends(require_role(UserRole.SYSTEM_ADMIN))],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """ユーザー作成（システム管理者のみ）"""
+    # 重複チェック
+    dup = await db.execute(
+        select(User).where((User.username == body.username) | (User.email == body.email))
+    )
+    if dup.scalar_one_or_none():
+        raise HTTPException(status_code=400, detail="ユーザー名またはメールアドレスがすでに使用されています")
+
+    try:
+        role_enum = UserRole(body.role)
+    except ValueError:
+        raise HTTPException(status_code=400, detail=f"無効なロール: {body.role}")
+
+    user = User(
+        user_id=uuid.uuid4(),
+        username=body.username,
+        email=body.email,
+        hashed_password=get_password_hash(body.password),
+        full_name=body.full_name,
+        role=role_enum,
+        is_active=body.is_active,
+    )
+    db.add(user)
+    await db.flush()
+    return user
