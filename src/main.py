@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from src.api.v1.router import api_router
 from src.core.config import settings
 from src.core.logging import setup_logging
+from src.graphql.schema import graphql_router
 from src.middleware.audit import AuditMiddleware
 from src.services.sla_monitor_service import sla_monitor
 
@@ -53,6 +54,7 @@ def create_app() -> FastAPI:
     app.add_middleware(AuditMiddleware)
 
     app.include_router(api_router, prefix="/api/v1")
+    app.include_router(graphql_router, prefix="/graphql")
 
     return app
 

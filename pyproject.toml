@@ -21,6 +21,7 @@ httpx = "^0.27.0"
 redis = "^5.0.0"
 structlog = "^24.2.0"
 apscheduler = "^3.10.0"
+strawberry-graphql = {extras = ["fastapi"], version = ">=0.220.0"}
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.2.0"
