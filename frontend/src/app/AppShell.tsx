@@ -6,7 +6,7 @@
 "use client";
 
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import Sidebar from "@/components/layout/Sidebar";
 import Header from "@/components/layout/Header";
 import { useAuthStore } from "@/hooks/useAuth";
@@ -19,30 +19,40 @@ interface Props {
 export default function AppShell({ children }: Props) {
   const pathname = usePathname();
   const router = useRouter();
-  const { initialize, isAuthenticated, isLoading } = useAuthStore();
+  const { initialize, isAuthenticated } = useAuthStore();
+  const [isInitialized, setIsInitialized] = useState(false);
 
-  // アプリ起動時に認証状態を復元
+  // アプリ起動時に認証状態を復元（完了を明示的に追跡）
   useEffect(() => {
-    initialize();
-  }, [initialize]);
+    initialize().finally(() => setIsInitialized(true));
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // 未認証ならログインページへリダイレクト
+  // 初期化完了後に未認証ならログインへ
   useEffect(() => {
-    if (!isLoading && !isAuthenticated && pathname !== "/login") {
+    if (isInitialized && !isAuthenticated && pathname !== "/login") {
       router.replace("/login");
     }
-  }, [isAuthenticated, isLoading, pathname, router]);
+  }, [isInitialized, isAuthenticated, pathname, router]);
 
   // ログインページはレイアウトなし
   if (pathname === "/login") {
     return <>{children}</>;
   }
 
-  // 認証確認中はローディング表示
-  if (isLoading || !isAuthenticated) {
+  // 初期化中はローディング表示
+  if (!isInitialized) {
     return (
       <div className="flex h-screen items-center justify-center bg-gray-50">
-        <LoadingSpinner size="lg" message="認証を確認中..." />
+        <LoadingSpinner size="lg" message="読み込み中..." />
+      </div>
+    );
+  }
+
+  // 未認証（リダイレクト中）
+  if (!isAuthenticated) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-gray-50">
+        <LoadingSpinner size="md" message="ログインページへ移動中..." />
       </div>
     );
   }
