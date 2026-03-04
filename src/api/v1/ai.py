@@ -10,6 +10,7 @@ from src.middleware.rbac import get_current_user
 from src.models.user import User
 from src.services.ai_decision_log_service import AIDecision, ai_decision_log_service
 from src.services.ai_triage_service import ai_triage_service
+from src.services.change_impact_service import change_impact_service
 
 router = APIRouter(prefix="/ai", tags=["ai"])
 
@@ -114,3 +115,58 @@ async def decisions_summary(
 ) -> dict:
     """AI決定ログの集計サマリーを返す"""
     return await ai_decision_log_service.get_summary()
+
+
+@router.post(
+    "/change-impact/{change_id}",
+    summary="変更影響分析実行",
+    status_code=status.HTTP_200_OK,
+)
+async def analyze_change_impact(
+    change_id: str,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+) -> dict:
+    """指定Changeの影響CI特定・競合チェック・リスク評価を実行"""
+    try:
+        result = await change_impact_service.analyze_impact(db, change_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+
+    return {
+        "change_id": result.change_id,
+        "risk_level": result.risk_level,
+        "risk_score": result.risk_score,
+        "affected_cis": result.affected_cis,
+        "conflicting_changes": result.conflicting_changes,
+        "recommendations": result.recommendations,
+        "analysis_reasoning": result.analysis_reasoning,
+    }
+
+
+@router.get(
+    "/change-impact/{change_id}",
+    summary="最新の変更影響分析結果取得",
+    status_code=status.HTTP_200_OK,
+)
+async def get_change_impact(
+    change_id: str,
+    current_user: Annotated[User, Depends(get_current_user)],
+) -> dict:
+    """指定ChangeのAI決定ログから最新の変更影響分析結果を返す"""
+    decisions = await ai_decision_log_service.get_decisions(
+        entity_id=change_id, action="change_impact"
+    )
+    if not decisions:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No impact analysis found for change: {change_id}",
+        )
+    latest = max(decisions, key=lambda d: d.timestamp)
+    return {
+        "change_id": latest.entity_id,
+        "output": latest.output_data,
+        "confidence": latest.confidence,
+        "provider": latest.provider,
+        "timestamp": latest.timestamp.isoformat(),
+    }
