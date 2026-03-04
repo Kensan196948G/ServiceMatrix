@@ -215,7 +215,9 @@ async def run_ai_triage(
     result = await db.execute(select(Incident).where(Incident.incident_id == incident_id))
     incident = result.scalar_one_or_none()
     if not incident:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="インシデントが見つかりません")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="インシデントが見つかりません"
+        )
     triage_result = await ai_triage_service.apply_triage_to_incident(db, str(incident_id))
     await db.flush()
     return {
