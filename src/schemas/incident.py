@@ -7,13 +7,29 @@ from pydantic import BaseModel, Field
 
 
 class IncidentCreate(BaseModel):
-    title: str = Field(..., min_length=1, max_length=500)
-    description: str | None = None
-    priority: str = Field(default="P3", pattern="^P[1-4]$")
-    category: str | None = None
-    subcategory: str | None = None
-    affected_service: str | None = None
-    reported_by: uuid.UUID | None = None
+    title: str = Field(
+        ...,
+        min_length=1,
+        max_length=500,
+        examples=["本番DBサーバーの応答が停止"],
+    )
+    description: str | None = Field(
+        None,
+        examples=[
+            "午前3時頃から本番DBサーバーへの接続がタイムアウトしている。"
+            "アプリログにconnection refused多数。"
+        ],
+    )
+    priority: str = Field(
+        default="P3",
+        pattern="^P[1-4]$",
+        examples=["P1"],
+        description="P1=緊急/P2=高/P3=中/P4=低",
+    )
+    category: str | None = Field(None, examples=["Infrastructure"])
+    subcategory: str | None = Field(None, examples=["Database"])
+    affected_service: str | None = Field(None, examples=["OrderService"])
+    reported_by: uuid.UUID | None = Field(None, examples=["123e4567-e89b-12d3-a456-426614174000"])
 
 
 class IncidentUpdate(BaseModel):

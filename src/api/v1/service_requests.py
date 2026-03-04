@@ -4,10 +4,12 @@ import uuid
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.database import get_db
 from src.middleware.rbac import get_current_user, require_role
+from src.models.service_request import ServiceRequest
 from src.models.user import User, UserRole
 from src.schemas.common import PaginatedResponse
 from src.schemas.service_request import (
@@ -16,9 +18,11 @@ from src.schemas.service_request import (
     ServiceRequestCreate,
     ServiceRequestResponse,
     ServiceRequestStatusTransition,
+    ServiceRequestToIncidentRequest,
+    ServiceRequestToIncidentResponse,
     ServiceRequestUpdate,
 )
-from src.services import service_request_service
+from src.services import incident_service, service_request_service
 
 router = APIRouter(prefix="/service-requests", tags=["service-requests"])
 
@@ -240,3 +244,62 @@ async def complete_service_request(
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e)) from e
     return sr
+
+
+@router.post(
+    "/{request_id}/create-incident",
+    response_model=ServiceRequestToIncidentResponse,
+    summary="SRからインシデント自動生成",
+    description="サービスリクエストの内容をもとにインシデントを自動生成します。",
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_incident_from_sr(
+    request_id: uuid.UUID,
+    body: ServiceRequestToIncidentRequest,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[
+        User,
+        Depends(
+            require_role(
+                UserRole.SYSTEM_ADMIN,
+                UserRole.SERVICE_MANAGER,
+                UserRole.INCIDENT_MANAGER,
+                UserRole.OPERATOR,
+            )
+        ),
+    ],
+) -> ServiceRequestToIncidentResponse:
+    """サービスリクエストからインシデントを自動生成"""
+    result = await db.execute(select(ServiceRequest).where(ServiceRequest.request_id == request_id))
+    sr = result.scalar_one_or_none()
+    if not sr:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="サービスリクエストが見つかりません",
+        )
+
+    description_parts = [
+        f"サービスリクエスト {sr.request_number} から自動生成されたインシデントです。"
+    ]
+    if sr.description:
+        description_parts.append(f"\n【SR詳細】\n{sr.description}")
+    if body.additional_notes:
+        description_parts.append(f"\n【追記】\n{body.additional_notes}")
+
+    incident_data = {
+        "title": f"[SR] {sr.title}",
+        "description": "\n".join(description_parts),
+        "priority": body.priority,
+        "category": body.category or sr.request_type,
+        "reported_by": sr.requested_by,
+    }
+    incident = await incident_service.create_incident(db, incident_data)
+    await db.flush()
+
+    return ServiceRequestToIncidentResponse(
+        incident_id=incident.incident_id,
+        incident_number=incident.incident_number,
+        service_request_id=sr.request_id,
+        service_request_number=sr.request_number,
+        message=f"インシデント {incident.incident_number} を作成しました。",
+    )

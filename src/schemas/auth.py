@@ -6,8 +6,12 @@ from pydantic import BaseModel, Field
 
 
 class LoginRequest(BaseModel):
-    username: str
-    password: str
+    username: str = Field(..., examples=["admin"])
+    password: str = Field(..., examples=["admin1234"])
+
+    model_config = {
+        "json_schema_extra": {"examples": [{"username": "admin", "password": "admin1234"}]}
+    }
 
 
 class TokenResponse(BaseModel):

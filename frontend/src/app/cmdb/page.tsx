@@ -7,7 +7,8 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
-import { ChevronLeft, ChevronRight, X, Search, Plus } from "lucide-react";
+import Link from "next/link";
+import { ChevronLeft, ChevronRight, X, Search, Plus, Share2 } from "lucide-react";
 import apiClient from "@/lib/api";
 import Table from "@/components/ui/Table";
 import Badge from "@/components/ui/Badge";
@@ -144,6 +145,12 @@ export default function CMDBPage() {
           >
             <Plus className="h-4 w-4" /> 新規CI登録
           </button>
+          <Link
+            href="/cmdb/graph"
+            className="flex items-center gap-1.5 rounded-lg bg-purple-600 px-3 py-2 text-sm font-medium text-white hover:bg-purple-700 transition"
+          >
+            <Share2 className="h-4 w-4" /> 依存関係グラフ
+          </Link>
         </div>
       </div>
 

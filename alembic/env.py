@@ -16,6 +16,7 @@ import src.models.problem  # noqa: F401
 import src.models.service_request  # noqa: F401
 import src.models.cmdb  # noqa: F401
 import src.models.audit  # noqa: F401
+import src.models.notification_settings  # noqa: F401
 
 config = context.config
 config.set_main_option("sqlalchemy.url", settings.database_url)
