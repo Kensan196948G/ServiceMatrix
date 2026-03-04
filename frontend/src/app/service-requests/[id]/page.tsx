@@ -17,6 +17,7 @@ import {
   ThumbsDown,
   Play,
   Flag,
+  Zap,
 } from "lucide-react";
 import apiClient from "@/lib/api";
 
@@ -85,6 +86,10 @@ export default function ServiceRequestDetailPage() {
   const [comment, setComment] = useState("");
   const [approvalComment, setApprovalComment] = useState("");
   const [actorName, setActorName] = useState("管理者");
+  const [showCreateIncident, setShowCreateIncident] = useState(false);
+  const [incidentPriority, setIncidentPriority] = useState("P3");
+  const [incidentNotes, setIncidentNotes] = useState("");
+  const [createdIncident, setCreatedIncident] = useState<{ incident_number: string; incident_id: string } | null>(null);
 
   const { data: sr, isLoading, isError } = useQuery<ServiceRequest>({
     queryKey: ["service-request", id],
@@ -93,6 +98,21 @@ export default function ServiceRequestDetailPage() {
       return res.data;
     },
     refetchInterval: 30000,
+  });
+
+  const createIncidentMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiClient.post(`/service-requests/${id}/create-incident`, {
+        priority: incidentPriority,
+        additional_notes: incidentNotes || null,
+      });
+      return res.data;
+    },
+    onSuccess: (data) => {
+      setCreatedIncident({ incident_number: data.incident_number, incident_id: data.incident_id });
+      setShowCreateIncident(false);
+      setIncidentNotes("");
+    },
   });
 
   const transitionMutation = useMutation({
@@ -240,8 +260,87 @@ export default function ServiceRequestDetailPage() {
               ステータス変更
             </button>
           )}
+          <button
+            onClick={() => setShowCreateIncident(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-orange-600 text-white rounded-lg text-sm hover:bg-orange-700"
+          >
+            <Zap className="h-4 w-4" />
+            インシデント生成
+          </button>
         </div>
       </div>
+
+      {/* インシデント生成モーダル */}
+      {showCreateIncident && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6 space-y-4">
+            <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+              <Zap className="h-5 w-5 text-orange-500" />
+              インシデント自動生成
+            </h2>
+            <p className="text-sm text-gray-500">
+              このSR「{sr.title}」からインシデントを生成します。
+            </p>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">優先度</label>
+              <select
+                value={incidentPriority}
+                onChange={e => setIncidentPriority(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+              >
+                <option value="P1">P1 - 緊急</option>
+                <option value="P2">P2 - 高</option>
+                <option value="P3">P3 - 中</option>
+                <option value="P4">P4 - 低</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">追記事項（任意）</label>
+              <textarea
+                value={incidentNotes}
+                onChange={e => setIncidentNotes(e.target.value)}
+                rows={3}
+                placeholder="インシデントに追記する内容..."
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-orange-400"
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setShowCreateIncident(false)}
+                className="px-4 py-2 text-gray-600 bg-gray-100 rounded-lg text-sm hover:bg-gray-200"
+              >
+                キャンセル
+              </button>
+              <button
+                onClick={() => createIncidentMutation.mutate()}
+                disabled={createIncidentMutation.isPending}
+                className="flex items-center gap-2 px-4 py-2 bg-orange-600 text-white rounded-lg text-sm hover:bg-orange-700 disabled:opacity-50"
+              >
+                {createIncidentMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Zap className="h-4 w-4" />}
+                生成する
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 生成済みインシデントバナー */}
+      {createdIncident && (
+        <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <CheckCircle className="h-5 w-5 text-orange-500" />
+            <span className="text-sm font-medium text-orange-800">
+              インシデント <strong>{createdIncident.incident_number}</strong> を生成しました
+            </span>
+          </div>
+          <button
+            onClick={() => router.push(`/incidents/${createdIncident.incident_id}`)}
+            className="text-xs text-orange-600 hover:underline font-medium"
+          >
+            詳細を確認 →
+          </button>
+        </div>
+      )}
 
       {/* Title card */}
       <div className="bg-white rounded-xl border border-gray-200 p-6">

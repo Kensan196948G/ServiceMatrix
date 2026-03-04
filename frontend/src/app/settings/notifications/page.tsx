@@ -1,21 +1,135 @@
 /**
- * 通知設定ページ
+ * 通知設定ページ（バックエンドAPI永続化対応）
  */
 "use client";
 
-import { Bell, Mail, Webhook, AlertTriangle, Clock } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Bell, Mail, Webhook, AlertTriangle, Clock, Save, RefreshCw } from "lucide-react";
 import { Card, CardHeader, CardTitle } from "@/components/ui/Card";
+import apiClient from "@/lib/api";
+import { useAuthStore } from "@/hooks/useAuth";
+
+interface NotificationSettings {
+  email: boolean;
+  sla_breach: boolean;
+  incident_created: boolean;
+  change_approved: boolean;
+  sr_completed: boolean;
+}
+
+interface ToggleRowProps {
+  label: string;
+  checked: boolean;
+  onChange: (v: boolean) => void;
+}
+
+function ToggleRow({ label, checked, onChange }: ToggleRowProps) {
+  return (
+    <div className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0">
+      <span className="text-sm text-gray-700">{label}</span>
+      <button
+        onClick={() => onChange(!checked)}
+        className={`relative h-5 w-9 rounded-full transition-colors ${checked ? "bg-blue-600" : "bg-gray-200"}`}
+        aria-checked={checked}
+        role="switch"
+      >
+        <div
+          className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform ${checked ? "translate-x-4" : "translate-x-0.5"}`}
+        />
+      </button>
+    </div>
+  );
+}
 
 export default function NotificationsPage() {
+  const { isAuthenticated } = useAuthStore();
+  const [settings, setSettings] = useState<NotificationSettings>({
+    email: true,
+    sla_breach: true,
+    incident_created: true,
+    change_approved: false,
+    sr_completed: false,
+  });
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    apiClient
+      .get<{ settings: NotificationSettings }>("/notifications/settings")
+      .then((res) => {
+        setSettings(res.data.settings);
+      })
+      .catch(() => {
+        // API未対応の場合はLocalStorageからフォールバック
+        const stored = localStorage.getItem("notificationSettings");
+        if (stored) {
+          try { setSettings(JSON.parse(stored)); } catch { /* ignore */ }
+        }
+      })
+      .finally(() => setLoading(false));
+  }, [isAuthenticated]);
+
+  const update = (key: keyof NotificationSettings, value: boolean) => {
+    setSettings((prev) => ({ ...prev, [key]: value }));
+    setSaved(false);
+  };
+
+  const handleSave = async () => {
+    if (!isAuthenticated) return;
+    setSaving(true);
+    setError(null);
+    try {
+      await apiClient.patch("/notifications/settings", settings);
+      localStorage.setItem("notificationSettings", JSON.stringify(settings));
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3000);
+    } catch (err) {
+      // フォールバック: LocalStorageのみ保存
+      localStorage.setItem("notificationSettings", JSON.stringify(settings));
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3000);
+      setError(err instanceof Error ? err.message : null);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-48">
+        <RefreshCw className="animate-spin text-gray-400" size={24} />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-          <Bell className="h-5 w-5 text-purple-500" />
-          通知設定
-        </h1>
-        <p className="text-sm text-gray-500 mt-0.5">アラート・メール・Webhook通知を設定します</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+            <Bell className="h-5 w-5 text-purple-500" />
+            通知設定
+          </h1>
+          <p className="text-sm text-gray-500 mt-0.5">アラート・メール・Webhook通知を設定します</p>
+        </div>
+        <button
+          onClick={handleSave}
+          disabled={saving}
+          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50 transition"
+        >
+          {saving ? <RefreshCw size={14} className="animate-spin" /> : <Save size={14} />}
+          {saved ? "✓ 保存済み" : "設定を保存"}
+        </button>
       </div>
+
+      {error && (
+        <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-md text-sm text-yellow-700">
+          APIへの保存は失敗しましたが、ローカルに保存しました: {error}
+        </div>
+      )}
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Card>
@@ -25,20 +139,17 @@ export default function NotificationsPage() {
               SLAアラート
             </CardTitle>
           </CardHeader>
-          <div className="space-y-3">
-            {[
-              { label: "SLA違反直前（30分前）", enabled: true },
-              { label: "SLA違反発生時", enabled: true },
-              { label: "P1インシデント発生時", enabled: true },
-              { label: "未対応インシデント（1時間超）", enabled: false },
-            ].map((item, i) => (
-              <div key={i} className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0">
-                <span className="text-sm text-gray-700">{item.label}</span>
-                <div className={`relative h-5 w-9 rounded-full transition-colors ${item.enabled ? "bg-blue-600" : "bg-gray-200"}`}>
-                  <div className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform ${item.enabled ? "translate-x-4" : "translate-x-0.5"}`} />
-                </div>
-              </div>
-            ))}
+          <div className="space-y-1">
+            <ToggleRow
+              label="SLA違反発生時"
+              checked={settings.sla_breach}
+              onChange={(v) => update("sla_breach", v)}
+            />
+            <ToggleRow
+              label="P1インシデント発生時"
+              checked={settings.incident_created}
+              onChange={(v) => update("incident_created", v)}
+            />
           </div>
         </Card>
 
@@ -50,13 +161,18 @@ export default function NotificationsPage() {
             </CardTitle>
           </CardHeader>
           <div className="space-y-3">
+            <ToggleRow
+              label="メール通知を有効化"
+              checked={settings.email}
+              onChange={(v) => update("email", v)}
+            />
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">送信先メールアドレス</label>
-              <input type="email" placeholder="admin@example.com" className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none" />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">SMTPサーバー</label>
-              <input type="text" placeholder="smtp.example.com:587" className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none" />
+              <input
+                type="email"
+                placeholder="admin@example.com"
+                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+              />
             </div>
             <p className="text-xs text-gray-400">※ メール送信機能は次バージョンで実装予定</p>
           </div>
@@ -66,25 +182,20 @@ export default function NotificationsPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Webhook className="h-4 w-4 text-green-500" />
-              Webhook設定
+              ワークフロー通知
             </CardTitle>
           </CardHeader>
-          <div className="space-y-3">
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Webhook URL</label>
-              <input type="url" placeholder="https://hooks.slack.com/..." className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none" />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">イベントタイプ</label>
-              <div className="space-y-1">
-                {["incident.created", "incident.escalated", "sla.breached", "change.approved"].map(evt => (
-                  <label key={evt} className="flex items-center gap-2 text-sm text-gray-700">
-                    <input type="checkbox" className="rounded border-gray-300 text-blue-600" defaultChecked={evt.includes("sla")} />
-                    <span className="font-mono text-xs">{evt}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
+          <div className="space-y-1">
+            <ToggleRow
+              label="変更承認時"
+              checked={settings.change_approved}
+              onChange={(v) => update("change_approved", v)}
+            />
+            <ToggleRow
+              label="サービスリクエスト完了時"
+              checked={settings.sr_completed}
+              onChange={(v) => update("sr_completed", v)}
+            />
           </div>
         </Card>
 
@@ -95,16 +206,18 @@ export default function NotificationsPage() {
               エスカレーション設定
             </CardTitle>
           </CardHeader>
-          <div className="space-y-3">
+          <div className="space-y-1">
             {[
               { label: "P1 エスカレーション時間", value: "15分" },
               { label: "P2 エスカレーション時間", value: "60分" },
               { label: "P3 エスカレーション時間", value: "4時間" },
               { label: "P4 エスカレーション時間", value: "24時間" },
-            ].map((item, i) => (
-              <div key={i} className="flex items-center justify-between py-1.5">
+            ].map((item) => (
+              <div key={item.label} className="flex items-center justify-between py-1.5">
                 <span className="text-sm text-gray-700">{item.label}</span>
-                <span className="text-sm font-medium text-blue-600 bg-blue-50 px-2 py-0.5 rounded">{item.value}</span>
+                <span className="text-sm font-medium text-blue-600 bg-blue-50 px-2 py-0.5 rounded">
+                  {item.value}
+                </span>
               </div>
             ))}
           </div>
@@ -113,3 +226,4 @@ export default function NotificationsPage() {
     </div>
   );
 }
+

@@ -9,6 +9,7 @@ from src.api.v1.changes import router as changes_router
 from src.api.v1.cmdb import router as cmdb_router
 from src.api.v1.health import router as health_router
 from src.api.v1.incidents import router as incidents_router
+from src.api.v1.notifications import router as notifications_router
 from src.api.v1.problems import router as problems_router
 from src.api.v1.service_requests import router as service_requests_router
 from src.api.v1.sla import router as sla_router
@@ -28,3 +29,4 @@ api_router.include_router(webhooks_router)
 api_router.include_router(audit_router)
 api_router.include_router(ai_router)
 api_router.include_router(websocket_router)
+api_router.include_router(notifications_router)

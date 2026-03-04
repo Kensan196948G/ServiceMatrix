@@ -66,3 +66,21 @@ class ServiceRequestResponse(BaseModel):
     updated_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class ServiceRequestToIncidentRequest(BaseModel):
+    """SRからインシデント自動生成リクエスト"""
+
+    priority: str = Field(default="P3", pattern="^P[1-4]$")
+    category: str | None = None
+    additional_notes: str | None = None
+
+
+class ServiceRequestToIncidentResponse(BaseModel):
+    """SRからインシデント自動生成レスポンス"""
+
+    incident_id: uuid.UUID
+    incident_number: str
+    service_request_id: uuid.UUID
+    service_request_number: str
+    message: str
