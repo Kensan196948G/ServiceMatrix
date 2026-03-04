@@ -51,9 +51,7 @@ const settingsCategories = [
     icon: Settings,
     label: "システム全般",
     description: "APIキー・Webhook・統合設定",
-    href: "/settings",
-    color: "text-gray-600",
-    bg: "bg-gray-100",
+    href: "/settings/general",
   },
 ];
 

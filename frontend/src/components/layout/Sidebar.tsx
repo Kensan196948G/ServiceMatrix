@@ -69,7 +69,7 @@ const navGroups: NavGroup[] = [
       { label: "セキュリティ管理", href: "/settings/security", icon: Lock },
       { label: "データ管理", href: "/settings/data", icon: HardDrive },
       { label: "外観設定", href: "/settings/appearance", icon: Palette },
-      { label: "システム全般", href: "/settings", icon: SlidersHorizontal },
+      { label: "システム全般", href: "/settings/general", icon: SlidersHorizontal },
     ],
   },
 ];
