@@ -1,0 +1,21 @@
+[Unit]
+Description=ServiceMatrix (Docker Compose)
+After=network.target docker.service
+Requires=docker.service
+
+[Service]
+Type=simple
+User=servicematrix
+WorkingDirectory=/opt/servicematrix
+EnvironmentFile=/opt/servicematrix/.env
+ExecStartPre=/usr/bin/docker compose -f /opt/servicematrix/docker-compose.prod.yml pull --quiet
+ExecStart=/usr/bin/docker compose -f /opt/servicematrix/docker-compose.prod.yml up --remove-orphans
+ExecStop=/usr/bin/docker compose -f /opt/servicematrix/docker-compose.prod.yml down
+Restart=on-failure
+RestartSec=30
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=servicematrix-docker
+
+[Install]
+WantedBy=multi-user.target

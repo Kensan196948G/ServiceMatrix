@@ -1,0 +1,20 @@
+[Unit]
+Description=ServiceMatrix Backend (FastAPI)
+After=network.target postgresql.service redis.service
+Wants=postgresql.service redis.service
+
+[Service]
+Type=simple
+User=servicematrix
+WorkingDirectory=/opt/servicematrix
+EnvironmentFile=/opt/servicematrix/.env
+ExecStartPre=/opt/servicematrix/scripts/linux/check-ports.sh
+ExecStart=/opt/servicematrix/scripts/linux/start-backend.sh
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=servicematrix-backend
+
+[Install]
+WantedBy=multi-user.target
