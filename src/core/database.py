@@ -12,10 +12,14 @@ engine = create_async_engine(
     settings.database_url,
     echo=settings.debug,
     pool_pre_ping=True,
-    **({
-        "pool_size": 10,
-        "max_overflow": 20,
-    } if _is_postgres else {}),
+    **(
+        {
+            "pool_size": 10,
+            "max_overflow": 20,
+        }
+        if _is_postgres
+        else {}
+    ),
 )
 
 AsyncSessionLocal = async_sessionmaker(
