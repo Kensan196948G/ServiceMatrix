@@ -203,7 +203,8 @@ async def test_sla_monitor_start_stop():
 
     await service.start()
     assert service.running is True
-    assert service._task is not None
+    # APSchedulerパスでは_scheduler、asyncioフォールバックでは_taskが設定される
+    assert service._task is not None or service._scheduler is not None
 
     await service.stop()
     assert service.running is False

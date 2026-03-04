@@ -3,7 +3,7 @@
 import uuid
 
 from sqlalchemy import JSON, CheckConstraint, ForeignKey, String, Text
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import Uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.models.base import Base, TimestampMixin
@@ -20,7 +20,7 @@ class ConfigurationItem(Base, TimestampMixin):
     )
 
     ci_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+        Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
     ci_name: Mapped[str] = mapped_column(String(200), nullable=False, index=True)
     ci_type: Mapped[str] = mapped_column(String(100), nullable=False)
@@ -28,7 +28,7 @@ class ConfigurationItem(Base, TimestampMixin):
     status: Mapped[str] = mapped_column(String(30), nullable=False, default="Active")
     version: Mapped[str | None] = mapped_column(String(50))
     owner_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("users.user_id"), nullable=True
+        Uuid(as_uuid=True), ForeignKey("users.user_id"), nullable=True
     )
     description: Mapped[str | None] = mapped_column(Text)
     attributes: Mapped[dict | None] = mapped_column(JSON)
@@ -50,13 +50,13 @@ class CIRelationship(Base, TimestampMixin):
     __tablename__ = "ci_relationships"
 
     relationship_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+        Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
     source_ci_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("configuration_items.ci_id"), nullable=False
+        Uuid(as_uuid=True), ForeignKey("configuration_items.ci_id"), nullable=False
     )
     target_ci_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("configuration_items.ci_id"), nullable=False
+        Uuid(as_uuid=True), ForeignKey("configuration_items.ci_id"), nullable=False
     )
     relationship_type: Mapped[str] = mapped_column(String(100), nullable=False)
     description: Mapped[str | None] = mapped_column(Text)

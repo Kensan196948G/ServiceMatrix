@@ -4,7 +4,7 @@ import uuid
 from datetime import datetime
 
 from sqlalchemy import JSON, DateTime, ForeignKey, Integer, String, Text
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import Uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.models.base import Base
@@ -20,7 +20,7 @@ class AuditLog(Base):
     )
 
     log_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+        Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, index=True
@@ -28,7 +28,7 @@ class AuditLog(Base):
 
     # アクター情報
     user_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("users.user_id"), nullable=True
+        Uuid(as_uuid=True), ForeignKey("users.user_id"), nullable=True
     )
     username: Mapped[str | None] = mapped_column(String(50))  # 削除時の参照保持
     user_role: Mapped[str | None] = mapped_column(String(50))
@@ -67,7 +67,7 @@ class AIAuditLog(Base):
     __table_args__ = ({"postgresql_partition_by": "RANGE (created_at)"},)
 
     ai_log_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+        Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, index=True
@@ -87,7 +87,7 @@ class AIAuditLog(Base):
     # 人間承認
     human_approved: Mapped[bool | None] = mapped_column()
     approved_by: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("users.user_id"), nullable=True
+        Uuid(as_uuid=True), ForeignKey("users.user_id"), nullable=True
     )
     approval_notes: Mapped[str | None] = mapped_column(Text)
 
@@ -101,11 +101,11 @@ class AuditLogIntegrity(Base):
     __tablename__ = "audit_log_integrity"
 
     integrity_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+        Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
     verified_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     verified_by: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("users.user_id"), nullable=True
+        Uuid(as_uuid=True), ForeignKey("users.user_id"), nullable=True
     )
     start_sequence: Mapped[int] = mapped_column(Integer, nullable=False)
     end_sequence: Mapped[int] = mapped_column(Integer, nullable=False)

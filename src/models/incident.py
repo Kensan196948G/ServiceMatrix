@@ -5,7 +5,7 @@ import uuid
 from datetime import datetime
 
 from sqlalchemy import CheckConstraint, DateTime, ForeignKey, String, Text
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import Uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.models.base import Base, TimestampMixin
@@ -53,7 +53,7 @@ class Incident(Base, TimestampMixin):
     )
 
     incident_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+        Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
     incident_number: Mapped[str] = mapped_column(
         String(20), nullable=False, unique=True, index=True
@@ -65,13 +65,13 @@ class Incident(Base, TimestampMixin):
 
     # 担当者・チーム
     assigned_to: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("users.user_id"), nullable=True
+        Uuid(as_uuid=True), ForeignKey("users.user_id"), nullable=True
     )
     assigned_team_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("teams.team_id"), nullable=True
+        Uuid(as_uuid=True), ForeignKey("teams.team_id"), nullable=True
     )
     reported_by: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("users.user_id"), nullable=True
+        Uuid(as_uuid=True), ForeignKey("users.user_id"), nullable=True
     )
 
     # SLAタイムスタンプ
