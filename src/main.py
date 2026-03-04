@@ -8,7 +8,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from src.api.v1.router import api_router
 from src.core.config import settings
 from src.core.logging import setup_logging
+from src.core.openapi import custom_openapi
 from src.middleware.audit import AuditMiddleware
+from src.middleware.rate_limit import RateLimitMiddleware
 from src.services.sla_monitor_service import sla_monitor
 
 
@@ -39,6 +41,7 @@ def create_app() -> FastAPI:
             {"name": "cmdb", "description": "構成管理データベース (CI・関係・影響分析)"},
             {"name": "sla", "description": "SLA監視・違反管理"},
             {"name": "webhooks", "description": "GitHub Webhook受信 (Issues/PR連携)"},
+            {"name": "api-keys", "description": "APIキー管理 (発行・無効化)"},
             {"name": "health", "description": "ヘルスチェック"},
         ],
     )
@@ -51,8 +54,12 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
     app.add_middleware(AuditMiddleware)
+    app.add_middleware(RateLimitMiddleware, max_requests=100, window_seconds=60)
 
     app.include_router(api_router, prefix="/api/v1")
+
+    # カスタムOpenAPIスキーマ設定
+    app.openapi = lambda: custom_openapi(app)
 
     return app
 
