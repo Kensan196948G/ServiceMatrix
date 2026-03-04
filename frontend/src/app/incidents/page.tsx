@@ -62,6 +62,7 @@ export default function IncidentsPage() {
   const [formError, setFormError] = useState("");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkStatus, setBulkStatus] = useState("");
+  const [bulkAssignee, setBulkAssignee] = useState("");
 
   const queryKey = ["incidents", page, filterStatus, filterPriority];
   const { data, isLoading, error, refetch } = useQuery({
@@ -121,6 +122,20 @@ export default function IncidentsPage() {
       queryClient.invalidateQueries({ queryKey: ["incidents"] });
       setSelectedIds(new Set());
       setBulkStatus("");
+    },
+  });
+
+  const bulkAssignMutation = useMutation({
+    mutationFn: async (assignee: string) => {
+      await apiClient.patch("/incidents/bulk/assign", {
+        incident_ids: Array.from(selectedIds),
+        assigned_to: assignee || null,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["incidents"] });
+      setSelectedIds(new Set());
+      setBulkAssignee("");
     },
   });
 
@@ -217,8 +232,9 @@ export default function IncidentsPage() {
           <>
             {/* 一括操作バー */}
             {selectedIds.size > 0 && (
-              <div className="flex items-center gap-3 bg-blue-50 border-b border-blue-200 px-4 py-2.5">
+              <div className="flex flex-wrap items-center gap-3 bg-blue-50 border-b border-blue-200 px-4 py-2.5">
                 <span className="text-sm font-medium text-blue-700">{selectedIds.size}件選択中</span>
+                {/* 一括ステータス変更 */}
                 <select
                   value={bulkStatus}
                   onChange={e => setBulkStatus(e.target.value)}
@@ -237,9 +253,25 @@ export default function IncidentsPage() {
                 >
                   {bulkTransitionMutation.isPending ? "処理中..." : "一括変更"}
                 </button>
+                {/* 一括担当者割り当て */}
+                <span className="text-blue-300">|</span>
+                <input
+                  type="text"
+                  value={bulkAssignee}
+                  onChange={e => setBulkAssignee(e.target.value)}
+                  placeholder="担当者UUID..."
+                  className="rounded border border-blue-300 px-2 py-1 text-xs bg-white w-56"
+                />
+                <button
+                  disabled={!bulkAssignee || bulkAssignMutation.isPending}
+                  onClick={() => bulkAssignMutation.mutate(bulkAssignee)}
+                  className="px-3 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700 disabled:opacity-50"
+                >
+                  {bulkAssignMutation.isPending ? "処理中..." : "一括割り当て"}
+                </button>
                 <button
                   onClick={() => setSelectedIds(new Set())}
-                  className="px-3 py-1 text-blue-600 text-xs hover:underline"
+                  className="px-3 py-1 text-blue-600 text-xs hover:underline ml-auto"
                 >
                   選択解除
                 </button>

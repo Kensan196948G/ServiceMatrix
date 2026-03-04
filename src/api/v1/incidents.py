@@ -13,6 +13,7 @@ from src.models.incident import Incident
 from src.models.user import User, UserRole
 from src.schemas.common import PaginatedResponse
 from src.schemas.incident import (
+    IncidentBulkAssign,
     IncidentCreate,
     IncidentResponse,
     IncidentStatusTransition,
@@ -187,3 +188,38 @@ async def transition_incident_status(
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e)) from e
     return incident
+
+
+@router.patch(
+    "/bulk/assign",
+    summary="インシデント一括担当者割り当て",
+    description="複数のインシデントに対して一括で担当者・担当チームを割り当てます。",
+)
+async def bulk_assign_incidents(
+    data: IncidentBulkAssign,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[
+        User,
+        Depends(
+            require_role(
+                UserRole.SYSTEM_ADMIN,
+                UserRole.SERVICE_MANAGER,
+                UserRole.INCIDENT_MANAGER,
+                UserRole.OPERATOR,
+            )
+        ),
+    ],
+) -> dict:
+    """インシデント一括担当者割り当て"""
+    updated_ids = []
+    for incident_id in data.incident_ids:
+        result = await db.execute(select(Incident).where(Incident.incident_id == incident_id))
+        incident = result.scalar_one_or_none()
+        if incident:
+            if data.assigned_to is not None:
+                incident.assigned_to = data.assigned_to
+            if data.assigned_team_id is not None:
+                incident.assigned_team_id = data.assigned_team_id
+            await db.flush()
+            updated_ids.append(str(incident_id))
+    return {"updated": len(updated_ids), "incident_ids": updated_ids}

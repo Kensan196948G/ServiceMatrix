@@ -11,7 +11,11 @@ interface Notification {
   body: string;
   time: string;
   read: boolean;
+  timestamp: number;
 }
+
+const STORAGE_KEY = "servicematrix_notifications";
+const MAX_STORED = 50;
 
 const SAMPLE_NOTIFICATIONS: Notification[] = [
   {
@@ -21,6 +25,7 @@ const SAMPLE_NOTIFICATIONS: Notification[] = [
     body: "本番DBサーバー（db-prod-01）で応答不能が検出されました",
     time: "2分前",
     read: false,
+    timestamp: Date.now() - 2 * 60 * 1000,
   },
   {
     id: "n2",
@@ -29,6 +34,7 @@ const SAMPLE_NOTIFICATIONS: Notification[] = [
     body: "INC-1042 の解決期限まであと15分です",
     time: "8分前",
     read: false,
+    timestamp: Date.now() - 8 * 60 * 1000,
   },
   {
     id: "n3",
@@ -36,41 +42,46 @@ const SAMPLE_NOTIFICATIONS: Notification[] = [
     title: "変更承認待ち",
     body: "CHG-0251「Nginx設定変更」が CAB承認待ちです",
     time: "32分前",
-    read: false,
-  },
-  {
-    id: "n4",
-    type: "incident",
-    title: "P2インシデント更新",
-    body: "INC-1039 のステータスが「調査中」に更新されました",
-    time: "1時間前",
     read: true,
-  },
-  {
-    id: "n5",
-    type: "sla",
-    title: "SLA違反",
-    body: "INC-1035 が解決SLAを超過しました（4時間超過）",
-    time: "2時間前",
-    read: true,
-  },
-  {
-    id: "n6",
-    type: "change",
-    title: "変更承認完了",
-    body: "CHG-0248「APIサーバー増設」が承認されました",
-    time: "3時間前",
-    read: true,
-  },
-  {
-    id: "n7",
-    type: "info",
-    title: "定期メンテナンス予告",
-    body: "本日 02:00〜04:00 に DB メンテナンスが予定されています",
-    time: "5時間前",
-    read: true,
+    timestamp: Date.now() - 32 * 60 * 1000,
   },
 ];
+
+function formatTime(timestamp: number): string {
+  const diff = Date.now() - timestamp;
+  if (diff < 60_000) return "今";
+  if (diff < 3600_000) return `${Math.floor(diff / 60_000)}分前`;
+  if (diff < 86400_000) return `${Math.floor(diff / 3600_000)}時間前`;
+  return new Date(timestamp).toLocaleDateString("ja-JP", { month: "short", day: "numeric" });
+}
+
+function loadFromStorage(): Notification[] {
+  if (typeof window === "undefined") return SAMPLE_NOTIFICATIONS;
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return SAMPLE_NOTIFICATIONS;
+    const stored: Notification[] = JSON.parse(raw);
+    // サンプルと重複しないようにマージ
+    const ids = new Set(stored.map((n) => n.id));
+    const merged = [...stored];
+    for (const s of SAMPLE_NOTIFICATIONS) {
+      if (!ids.has(s.id)) merged.push(s);
+    }
+    return merged.sort((a, b) => b.timestamp - a.timestamp).slice(0, MAX_STORED);
+  } catch {
+    return SAMPLE_NOTIFICATIONS;
+  }
+}
+
+function saveToStorage(notifications: Notification[]) {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify(notifications.slice(0, MAX_STORED))
+    );
+  } catch {}
+}
 
 const TYPE_ICON: Record<Notification["type"], React.ReactNode> = {
   incident: <AlertTriangle className="w-4 h-4 text-red-500" />,
@@ -88,7 +99,19 @@ const TYPE_BG: Record<Notification["type"], string> = {
 
 export default function NotificationPanel() {
   const [open, setOpen] = useState(false);
-  const [notifications, setNotifications] = useState<Notification[]>(SAMPLE_NOTIFICATIONS);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+
+  // マウント時にLocalStorageから読み込み
+  useEffect(() => {
+    setNotifications(loadFromStorage());
+  }, []);
+
+  // 通知変更時にLocalStorageへ保存
+  useEffect(() => {
+    if (notifications.length > 0) {
+      saveToStorage(notifications);
+    }
+  }, [notifications]);
 
   // WebSocket でリアルタイム通知を受信
   const { isConnected } = useWebSocket({
@@ -108,8 +131,9 @@ export default function NotificationPanel() {
         body: (payload.description as string) ?? (payload.message as string) ?? JSON.stringify(payload).slice(0, 80),
         time: "今",
         read: false,
+        timestamp: Date.now(),
       };
-      setNotifications((prev) => [newNotif, ...prev]);
+      setNotifications((prev) => [newNotif, ...prev].slice(0, MAX_STORED));
     },
     autoReconnect: true,
   });
@@ -128,6 +152,13 @@ export default function NotificationPanel() {
     setNotifications((prev) =>
       prev.map((n) => (n.id === id ? { ...n, read: true } : n))
     );
+  };
+
+  const clearAll = () => {
+    setNotifications([]);
+    if (typeof window !== "undefined") {
+      localStorage.removeItem(STORAGE_KEY);
+    }
   };
 
   return (
@@ -203,7 +234,9 @@ export default function NotificationPanel() {
                         </button>
                       </div>
                       <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{n.body}</p>
-                      <p className="text-[11px] text-gray-400 mt-1">{n.time}</p>
+                      <p className="text-[11px] text-gray-400 mt-1">
+                        {n.timestamp ? formatTime(n.timestamp) : n.time}
+                      </p>
                     </div>
                   </div>
                 ))
@@ -214,7 +247,7 @@ export default function NotificationPanel() {
             {notifications.length > 0 && (
               <div className="border-t border-gray-100 px-4 py-2.5 text-center">
                 <button
-                  onClick={() => setNotifications([])}
+                  onClick={clearAll}
                   className="text-xs text-gray-400 hover:text-gray-600"
                 >
                   すべてクリア
