@@ -6,11 +6,29 @@
 
 import { Bell, LogOut, User } from "lucide-react";
 import { useCallback, useState } from "react";
+import { usePathname } from "next/navigation";
 import { useAuthStore } from "@/hooks/useAuth";
 import { useWebSocket } from "@/hooks/useWebSocket";
 
+/** パスからページタイトルを取得 */
+function getPageTitle(pathname: string): string {
+  const titles: Record<string, string> = {
+    "/": "ダッシュボード",
+    "/incidents": "インシデント管理",
+    "/changes": "変更管理",
+    "/problems": "問題管理",
+    "/service-requests": "サービスリクエスト",
+    "/sla": "SLA監視",
+    "/ai": "AI分析",
+    "/cmdb": "CMDB管理",
+    "/audit-logs": "監査ログ",
+  };
+  return titles[pathname] ?? "ServiceMatrix";
+}
+
 export default function Header() {
   const { user, logout } = useAuthStore();
+  const pathname = usePathname();
   const [unread, setUnread] = useState(0);
 
   useWebSocket({
@@ -20,8 +38,8 @@ export default function Header() {
 
   return (
     <header className="flex h-16 items-center justify-between border-b border-gray-200 bg-white px-6">
-      {/* ページタイトル領域 */}
-      <div />
+      {/* ページタイトル */}
+      <h1 className="text-lg font-semibold text-gray-800">{getPageTitle(pathname)}</h1>
 
       {/* ユーザー情報・通知・ログアウト */}
       <div className="flex items-center gap-4">

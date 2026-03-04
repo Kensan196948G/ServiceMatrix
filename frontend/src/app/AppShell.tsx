@@ -5,11 +5,12 @@
  */
 "use client";
 
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect } from "react";
 import Sidebar from "@/components/layout/Sidebar";
 import Header from "@/components/layout/Header";
 import { useAuthStore } from "@/hooks/useAuth";
+import LoadingSpinner from "@/components/ui/LoadingSpinner";
 
 interface Props {
   children: React.ReactNode;
@@ -17,16 +18,33 @@ interface Props {
 
 export default function AppShell({ children }: Props) {
   const pathname = usePathname();
-  const { initialize } = useAuthStore();
+  const router = useRouter();
+  const { initialize, isAuthenticated, isLoading } = useAuthStore();
 
   // アプリ起動時に認証状態を復元
   useEffect(() => {
     initialize();
   }, [initialize]);
 
+  // 未認証ならログインページへリダイレクト
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated && pathname !== "/login") {
+      router.replace("/login");
+    }
+  }, [isAuthenticated, isLoading, pathname, router]);
+
   // ログインページはレイアウトなし
   if (pathname === "/login") {
     return <>{children}</>;
+  }
+
+  // 認証確認中はローディング表示
+  if (isLoading || !isAuthenticated) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-gray-50">
+        <LoadingSpinner size="lg" message="認証を確認中..." />
+      </div>
+    );
   }
 
   return (
