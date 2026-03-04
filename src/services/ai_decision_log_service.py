@@ -10,13 +10,13 @@ logger = get_logger(__name__)
 
 @dataclass
 class AIDecision:
-    action: str          # "triage", "rca", "change_risk", "similar_search"
-    entity_type: str     # "incident", "change", "problem"
+    action: str  # "triage", "rca", "change_risk", "similar_search"
+    entity_type: str  # "incident", "change", "problem"
     entity_id: str
     input_data: dict
     output_data: dict
     confidence: float
-    provider: str        # "keyword", "openai", "rule_based"
+    provider: str  # "keyword", "openai", "rule_based"
     timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
 
 

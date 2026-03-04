@@ -11,11 +11,11 @@ logger = get_logger(__name__)
 
 @dataclass
 class RepairCandidate:
-    action: str       # "restart_service", "clear_cache", "rollback", "scale_up", "manual"
+    action: str  # "restart_service", "clear_cache", "rollback", "scale_up", "manual"
     description: str
-    risk_level: str   # "low", "medium", "high"
+    risk_level: str  # "low", "medium", "high"
     confidence: float  # 0.0-1.0
-    automated: bool   # True=自動実行可能
+    automated: bool  # True=自動実行可能
     steps: list[str] = field(default_factory=list)
 
 
@@ -113,7 +113,16 @@ class AutoRepairService:
         "timeout": ["timeout", "timed out", "タイムアウト", "応答なし", "hang"],
         "error": ["error", "failed", "failure", "exception", "エラー", "失敗", "障害"],
         "outage": ["outage", "down", "unavailable", "停止", "ダウン", "障害"],
-        "performance": ["slow", "performance", "latency", "遅い", "遅延", "高負荷", "cpu", "memory"],
+        "performance": [
+            "slow",
+            "performance",
+            "latency",
+            "遅い",
+            "遅延",
+            "高負荷",
+            "cpu",
+            "memory",
+        ],
     }
 
     async def analyze(

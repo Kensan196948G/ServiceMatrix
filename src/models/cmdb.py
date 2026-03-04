@@ -2,8 +2,7 @@
 
 import uuid
 
-from sqlalchemy import JSON, CheckConstraint, ForeignKey, String, Text
-from sqlalchemy import Uuid
+from sqlalchemy import JSON, CheckConstraint, ForeignKey, String, Text, Uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.models.base import Base, TimestampMixin

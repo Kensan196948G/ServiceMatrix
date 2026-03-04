@@ -148,7 +148,7 @@ export default function CMDBPage() {
       </div>
 
       {/* フィルター・検索バー */}
-      <div className="mb-4 flex flex-wrap gap-3">
+      <div className="mb-4 flex flex-wrap gap-3 rounded-lg border border-gray-200 bg-white p-3 shadow-sm">
         <div className="relative flex-1 min-w-48">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
           <input
@@ -179,6 +179,31 @@ export default function CMDBPage() {
             <option key={s} value={s}>{s}</option>
           ))}
         </select>
+        {(search || filterType || filterStatus) && (
+          <button
+            onClick={() => { setSearch(""); setFilterType(""); setFilterStatus(""); setSkip(0); }}
+            className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 font-medium px-2"
+          >
+            <X className="h-3.5 w-3.5" /> フィルタをリセット
+          </button>
+        )}
+        {/* フィルター結果サマリー */}
+        {(filterType || filterStatus) && (
+          <div className="flex items-center gap-2 ml-auto">
+            {filterType && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-800">
+                タイプ: {filterType}
+                <button onClick={() => handleFilterType("")}><X className="h-3 w-3" /></button>
+              </span>
+            )}
+            {filterStatus && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800">
+                状態: {filterStatus}
+                <button onClick={() => handleFilterStatus("")}><X className="h-3 w-3" /></button>
+              </span>
+            )}
+          </div>
+        )}
       </div>
 
       <Table<CI>

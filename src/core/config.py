@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
 
     # データベース
-    database_url: str = "postgresql+asyncpg://servicematrix:password@localhost:5432/servicematrix"
+    database_url: str = "sqlite+aiosqlite:///./servicematrix.db"
 
     # Redis
     redis_url: str = "redis://localhost:6379/0"

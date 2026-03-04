@@ -45,7 +45,7 @@ async def websocket_endpoint(
                 data = await asyncio.wait_for(websocket.receive_text(), timeout=KEEPALIVE_INTERVAL)
                 if data == "ping":
                     await websocket.send_text("pong")
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 # Server-initiated ping
                 await websocket.send_text('{"type":"ping"}')
     except WebSocketDisconnect:

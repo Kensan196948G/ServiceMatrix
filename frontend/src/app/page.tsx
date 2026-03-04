@@ -221,6 +221,19 @@ export default function DashboardPage() {
         </div>
       </div>
 
+      {/* SLA違反アラートバナー */}
+      {stats.incBreached > 0 && (
+        <div className="flex items-center gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3">
+          <AlertTriangle className="h-5 w-5 shrink-0 text-red-500" />
+          <p className="text-sm font-medium text-red-800">
+            SLA違反が <strong>{stats.incBreached}件</strong> 発生しています。
+            <Link href="/sla" className="ml-2 underline hover:text-red-900">
+              SLA監視ダッシュボードで確認 →
+            </Link>
+          </p>
+        </div>
+      )}
+
       {/* KPIカード */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         {kpiCards.map((card) => (

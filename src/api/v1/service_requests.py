@@ -147,9 +147,7 @@ async def submit_service_request(
 ):
     """申請提出（New→Pending_Approval）"""
     try:
-        sr = await service_request_service.submit_request(
-            db, request_id, str(current_user.user_id)
-        )
+        sr = await service_request_service.submit_request(db, request_id, str(current_user.user_id))
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e)) from e
     return sr

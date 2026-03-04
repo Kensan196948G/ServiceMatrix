@@ -132,7 +132,9 @@ async def transition_service_request_status(
     return sr
 
 
-async def submit_request(db: AsyncSession, request_id: uuid.UUID, submitted_by: str) -> ServiceRequest:
+async def submit_request(
+    db: AsyncSession, request_id: uuid.UUID, submitted_by: str
+) -> ServiceRequest:
     """申請者がリクエストを提出（New→Pending_Approval）"""
     sr = await transition_service_request_status(db, request_id, "Pending_Approval", None)
     await audit_service.record_audit_log(

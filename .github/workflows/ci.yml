@@ -4,12 +4,14 @@ on:
   push:
     branches:
       - main
+      - develop
       - 'feature/**'
       - 'fix/**'
       - 'docs/**'
   pull_request:
     branches:
       - main
+      - develop
 
 permissions:
   contents: read
@@ -229,8 +231,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v3
-      - run: uv pip install --system ruff
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install ruff
+        run: pip install ruff
       - run: ruff check src/ --output-format=github
       - run: ruff format src/ --check
 

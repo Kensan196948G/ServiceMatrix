@@ -18,7 +18,13 @@ from src.core.security import (
 )
 from src.middleware.rbac import get_current_user, require_role
 from src.models.user import User, UserRole
-from src.schemas.auth import LoginRequest, RefreshRequest, TokenResponse, UserCreateRequest, UserResponse
+from src.schemas.auth import (
+    LoginRequest,
+    RefreshRequest,
+    TokenResponse,
+    UserCreateRequest,
+    UserResponse,
+)
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -96,7 +102,9 @@ async def get_me(current_user: Annotated[User, Depends(get_current_user)]):
 
 @router.get("/users", response_model=list[UserResponse])
 async def list_users(
-    current_user: Annotated[User, Depends(require_role(UserRole.SYSTEM_ADMIN, UserRole.SERVICE_MANAGER))],
+    current_user: Annotated[
+        User, Depends(require_role(UserRole.SYSTEM_ADMIN, UserRole.SERVICE_MANAGER))
+    ],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     """ユーザー一覧取得（管理者のみ）"""
@@ -116,12 +124,14 @@ async def create_user(
         select(User).where((User.username == body.username) | (User.email == body.email))
     )
     if dup.scalar_one_or_none():
-        raise HTTPException(status_code=400, detail="ユーザー名またはメールアドレスがすでに使用されています")
+        raise HTTPException(
+            status_code=400, detail="ユーザー名またはメールアドレスがすでに使用されています"
+        )
 
     try:
         role_enum = UserRole(body.role)
-    except ValueError:
-        raise HTTPException(status_code=400, detail=f"無効なロール: {body.role}")
+    except ValueError as err:
+        raise HTTPException(status_code=400, detail=f"無効なロール: {body.role}") from err
 
     user = User(
         user_id=uuid.uuid4(),

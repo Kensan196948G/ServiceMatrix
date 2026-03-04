@@ -27,6 +27,12 @@ class IncidentUpdate(BaseModel):
     resolution_notes: str | None = None
 
 
+class IncidentBulkAssign(BaseModel):
+    incident_ids: list[uuid.UUID] = Field(..., min_length=1, max_length=100)
+    assigned_to: uuid.UUID | None = None
+    assigned_team_id: uuid.UUID | None = None
+
+
 class IncidentStatusTransition(BaseModel):
     new_status: str
     notes: str | None = None
