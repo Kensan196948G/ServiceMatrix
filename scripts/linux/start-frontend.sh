@@ -41,6 +41,17 @@ cd "$FRONTEND_DIR"
 # .next/standalone があれば Node.js サーバ直接起動
 if [[ -f ".next/standalone/server.js" ]]; then
   log "Using standalone Next.js server"
+
+  # standalone モードでは static/ と public/ を手動コピーする必要がある
+  if [[ ! -d ".next/standalone/.next/static" ]] && [[ -d ".next/static" ]]; then
+    log "Copying .next/static -> .next/standalone/.next/static"
+    cp -r ".next/static" ".next/standalone/.next/static"
+  fi
+  if [[ ! -d ".next/standalone/public" ]] && [[ -d "public" ]]; then
+    log "Copying public -> .next/standalone/public"
+    cp -r "public" ".next/standalone/public"
+  fi
+
   export PORT="$NODE_PORT"
   export HOSTNAME="$BIND_IP"
   exec node .next/standalone/server.js
