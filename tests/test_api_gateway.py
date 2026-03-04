@@ -1,20 +1,16 @@
 """Step36 OpenAPI仕様書・レート制限・APIキー管理テスト"""
 
-import asyncio
 import time
 from collections import deque
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 
-from src.core.openapi import custom_openapi
 from src.main import app
 from src.middleware.rate_limit import RateLimitMiddleware
 from src.models.api_key import APIKey
 from src.services import api_key_service
-
 
 # ────────────────────────────────────────────────────────────────
 # OpenAPIスキーマテスト
