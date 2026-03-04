@@ -31,7 +31,7 @@ interface SRItem {
   title: string;
   description?: string;
   status: string;
-  priority?: string;
+  request_type?: string;
   created_at: string;
 }
 
@@ -40,7 +40,7 @@ export default function ServiceRequestsPage() {
   const [page, setPage] = useState(1);
   const [filterStatus, setFilterStatus] = useState("");
   const [showCreate, setShowCreate] = useState(false);
-  const [form, setForm] = useState({ title: "", description: "", priority: "P3" });
+  const [form, setForm] = useState({ title: "", description: "", request_type: "" });
   const [formError, setFormError] = useState("");
 
   const { data, isLoading, error, refetch } = useQuery({
@@ -57,7 +57,7 @@ export default function ServiceRequestsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["service-requests"] });
       setShowCreate(false);
-      setForm({ title: "", description: "", priority: "P3" });
+      setForm({ title: "", description: "", request_type: "" });
     },
     onError: (e: unknown) => {
       const msg = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail ?? "作成に失敗しました";
@@ -101,13 +101,13 @@ export default function ServiceRequestsPage() {
         ) : (
           <>
             <div className="grid grid-cols-[140px_1fr_90px_150px_120px] gap-3 border-b border-gray-100 bg-gray-50 px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-gray-500">
-              <span>番号</span><span>タイトル</span><span>優先度</span><span>ステータス</span><span>作成日時</span>
+              <span>番号</span><span>タイトル</span><span>種別</span><span>ステータス</span><span>作成日時</span>
             </div>
             {requests.map((req) => (
               <Link key={req.request_id} href={`/service-requests/${req.request_id}`} className="grid grid-cols-[140px_1fr_90px_150px_120px] gap-3 items-center border-b border-gray-50 px-4 py-3 hover:bg-blue-50/40 transition-colors cursor-pointer last:border-0">
                 <span className="font-mono text-xs text-gray-500">{req.request_number}</span>
                 <p className="truncate text-sm font-medium text-gray-800">{req.title}</p>
-                <span className="text-xs text-gray-500">{req.priority ?? "P3"}</span>
+                <span className="text-xs text-gray-500">{req.request_type ?? "—"}</span>
                 <span><Badge variant={getStatusVariant(req.status)}>{req.status.replace(/_/g, " ")}</Badge></span>
                 <span className="text-xs text-gray-400">{new Date(req.created_at).toLocaleDateString("ja-JP", { month: "short", day: "numeric" })}</span>
               </Link>
@@ -139,19 +139,20 @@ export default function ServiceRequestsPage() {
             <textarea value={form.description} onChange={e => setForm(f=>({...f,description:e.target.value}))} rows={3} className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none resize-none" />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">優先度</label>
-            <select value={form.priority} onChange={e => setForm(f=>({...f,priority:e.target.value}))} className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none">
-              <option value="P1">P1 - 緊急</option>
-              <option value="P2">P2 - 高</option>
-              <option value="P3">P3 - 中</option>
-              <option value="P4">P4 - 低</option>
-            </select>
+            <label className="block text-sm font-medium text-gray-700 mb-1">種別</label>
+            <input
+              type="text"
+              value={form.request_type}
+              onChange={e => setForm(f=>({...f, request_type: e.target.value}))}
+              placeholder="例: アカウント作成、ソフトウェアインストール"
+              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+            />
           </div>
           <div className="flex justify-end gap-3 pt-2">
             <Button variant="secondary" onClick={() => { setShowCreate(false); setFormError(""); }}>キャンセル</Button>
             <Button variant="primary" loading={createMutation.isPending} onClick={() => {
               if (!form.title.trim()) { setFormError("タイトルは必須です"); return; }
-              createMutation.mutate({ title: form.title, description: form.description, priority: form.priority });
+              createMutation.mutate({ title: form.title, description: form.description, request_type: form.request_type });
             }}>リクエストを作成</Button>
           </div>
         </div>

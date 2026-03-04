@@ -4,7 +4,7 @@
 "use client";
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect } from "react";
+import { useEffect, useCallback } from "react";
 import Link from "next/link";
 import {
   AlertTriangle, GitPullRequest, HelpCircle, ClipboardList,
@@ -41,26 +41,37 @@ export default function DashboardPage() {
   const { user } = useAuthStore();
   const queryClient = useQueryClient();
 
-  // WebSocketでリアルタイム更新
+  // WebSocketでリアルタイム更新（正しいエンドポイント: /api/v1/ws/incidents?token=JWT）
+  const invalidateIncidents = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: ["dashboard-incidents"] });
+  }, [queryClient]);
+  const invalidateChanges = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: ["dashboard-changes"] });
+  }, [queryClient]);
+
   useEffect(() => {
-    const wsUrl = `ws://${window.location.hostname}:8001/ws/notifications`;
+    if (typeof window === "undefined") return;
+    const token = localStorage.getItem("access_token");
+    if (!token) return;
+
+    const base = `${window.location.protocol === "https:" ? "wss" : "ws"}://${window.location.hostname}:8001/api/v1`;
     let ws: WebSocket | null = null;
     let retryTimer: ReturnType<typeof setTimeout> | null = null;
 
     const connect = () => {
-      ws = new WebSocket(wsUrl);
+      ws = new WebSocket(`${base}/ws/incidents?token=${token}`);
       ws.onmessage = (evt) => {
         try {
           const msg = JSON.parse(evt.data);
           if (msg.type === "incident_update" || msg.type === "incident_created") {
-            queryClient.invalidateQueries({ queryKey: ["dashboard-incidents"] });
+            invalidateIncidents();
           } else if (msg.type === "change_update") {
-            queryClient.invalidateQueries({ queryKey: ["dashboard-changes"] });
+            invalidateChanges();
           }
         } catch { /* ignore parse errors */ }
       };
       ws.onclose = () => {
-        retryTimer = setTimeout(connect, 10000);
+        retryTimer = setTimeout(connect, 15000);
       };
     };
 
@@ -69,7 +80,7 @@ export default function DashboardPage() {
       ws?.close();
       if (retryTimer) clearTimeout(retryTimer);
     };
-  }, [queryClient]);
+  }, [invalidateIncidents, invalidateChanges]);
 
   const { data: incidents, isLoading: incLoading } = useQuery({
     queryKey: ["dashboard-incidents"],
