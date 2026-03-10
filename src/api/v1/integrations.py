@@ -14,6 +14,7 @@ from src.middleware.rbac import get_current_user, require_role
 from src.models.incident import Incident, IncidentPriority, IncidentStatus
 from src.models.integration import IntegrationConfig
 from src.models.user import User, UserRole
+from src.services.notification_service import notification_service
 
 router = APIRouter(prefix="/integrations", tags=["integrations"])
 
@@ -151,6 +152,57 @@ async def get_sync_log(
 
 
 # ---------- Webhook Receivers ----------
+
+
+@router.get("/github/sync", summary="GitHub同期状態確認")
+async def github_sync_status(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+) -> dict[str, Any]:
+    """ServiceMatrix ↔ GitHub Issue の同期状態を返す"""
+    rows = (await db.execute(select(Incident).where(Incident.github_issue_number.isnot(None)))).scalars().all()
+    return {
+        "synced_incidents": len(rows),
+        "items": [
+            {
+                "incident_id": str(r.incident_id),
+                "incident_number": r.incident_number,
+                "github_issue_number": r.github_issue_number,
+                "status": r.status,
+                "priority": r.priority,
+            }
+            for r in rows
+        ],
+    }
+
+
+@router.post("/github/sync/{incident_id}", summary="インシデントをGitHub Issueに手動同期")
+async def sync_incident_to_github(
+    incident_id: uuid.UUID,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[User, Depends(require_role(UserRole.SYSTEM_ADMIN))],
+) -> dict[str, Any]:
+    """指定インシデントのGitHub Issue手動同期（作成または解決クローズ）"""
+    incident = await db.get(Incident, incident_id)
+    if not incident:
+        raise HTTPException(status_code=404, detail="Incident not found")
+
+    if incident.status in ("Resolved", "Closed") and incident.github_issue_number:
+        closed = await notification_service.close_incident_github_issue(
+            incident.github_issue_number, incident.incident_number
+        )
+        return {"action": "closed", "github_issue_number": incident.github_issue_number, "success": closed}
+
+    if not incident.github_issue_number:
+        issue_number = await notification_service.create_incident_github_issue(
+            incident.incident_number, incident.title, incident.priority, incident.description or ""
+        )
+        if issue_number:
+            incident.github_issue_number = issue_number
+            await db.commit()
+        return {"action": "created", "github_issue_number": issue_number}
+
+    return {"action": "no_change", "github_issue_number": incident.github_issue_number}
 
 
 @router.post("/webhook/jira", summary="Jira Webhookエンドポイント", status_code=status.HTTP_200_OK)

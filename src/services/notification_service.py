@@ -35,6 +35,90 @@ class NotificationService:
 
         return results
 
+    def _github_headers(self) -> dict:
+        return {
+            "Authorization": f"Bearer {settings.github_token}",  # noqa: S105
+            "Accept": "application/vnd.github+json",
+        }
+
+    async def create_incident_github_issue(
+        self,
+        incident_number: str,
+        incident_title: str,
+        priority: str,
+        description: str = "",
+    ) -> int | None:
+        """インシデント作成時にGitHub Issueを自動生成し、Issue番号を返す"""
+        if not (settings.github_token and settings.github_repo):
+            return None
+        priority_label_map = {"P1": "critical", "P2": "high", "P3": "medium", "P4": "low"}
+        labels = ["servicematrix-incident", f"priority:{priority_label_map.get(priority, 'medium')}"]
+        payload = {
+            "title": f"[{incident_number}] {incident_title}",
+            "body": (
+                f"## ServiceMatrix インシデント\n\n"
+                f"- **番号**: {incident_number}\n"
+                f"- **優先度**: {priority}\n\n"
+                f"### 概要\n{description or '（説明なし）'}"
+            ),
+            "labels": labels,
+        }
+        url = f"https://api.github.com/repos/{settings.github_repo}/issues"
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.post(url, json=payload, headers=self._github_headers(), timeout=10)
+                response.raise_for_status()
+                data = response.json()
+                issue_number: int = data["number"]
+                logger.info("incident_github_issue_created", issue_number=issue_number, incident=incident_number)
+                return issue_number
+        except Exception as e:  # noqa: BLE001
+            logger.warning("incident_github_issue_creation_failed", error=str(e), incident=incident_number)
+            return None
+
+    async def close_incident_github_issue(
+        self,
+        github_issue_number: int,
+        incident_number: str,
+    ) -> bool:
+        """インシデント解決時にGitHub IssueをCloseする"""
+        if not (settings.github_token and settings.github_repo):
+            return False
+        url = f"https://api.github.com/repos/{settings.github_repo}/issues/{github_issue_number}"
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.patch(
+                    url, json={"state": "closed"}, headers=self._github_headers(), timeout=10
+                )
+                response.raise_for_status()
+                logger.info("incident_github_issue_closed", issue_number=github_issue_number, incident=incident_number)
+                return True
+        except Exception as e:  # noqa: BLE001
+            logger.warning("incident_github_issue_close_failed", error=str(e), incident=incident_number)
+            return False
+
+    async def add_github_issue_comment(
+        self,
+        github_issue_number: int,
+        comment: str,
+        incident_number: str,
+    ) -> bool:
+        """GitHub IssueにコメントをPOSTする"""
+        if not (settings.github_token and settings.github_repo):
+            return False
+        url = f"https://api.github.com/repos/{settings.github_repo}/issues/{github_issue_number}/comments"
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    url, json={"body": comment}, headers=self._github_headers(), timeout=10
+                )
+                response.raise_for_status()
+                logger.info("github_issue_comment_added", issue_number=github_issue_number, incident=incident_number)
+                return True
+        except Exception as e:  # noqa: BLE001
+            logger.warning("github_issue_comment_failed", error=str(e), incident=incident_number)
+            return False
+
     async def _create_github_issue(
         self,
         incident_number: str,
@@ -42,7 +126,7 @@ class NotificationService:
         priority: str,
         breach_type: str,
     ) -> dict | None:
-        """GitHub REST API でIssueを作成"""
+        """GitHub REST API でSLA違反IssueまたはコメントをPOST"""
         title = f"[SLA違反] {incident_number}: {incident_title}"
         body = (
             f"## SLA違反検出\n\n"
@@ -57,13 +141,9 @@ class NotificationService:
             "labels": ["sla-breach", f"priority:{priority}"],
         }
         url = f"https://api.github.com/repos/{settings.github_repo}/issues"
-        headers = {
-            "Authorization": f"Bearer {settings.github_token}",  # noqa: S105
-            "Accept": "application/vnd.github+json",
-        }
         try:
             async with httpx.AsyncClient() as client:
-                response = await client.post(url, json=payload, headers=headers, timeout=10)
+                response = await client.post(url, json=payload, headers=self._github_headers(), timeout=10)
                 response.raise_for_status()
                 data = response.json()
                 logger.info(

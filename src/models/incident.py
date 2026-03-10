@@ -86,6 +86,9 @@ class Incident(Base, TimestampMixin):
     sla_breached: Mapped[bool] = mapped_column(default=False, nullable=False)
     sla_breached_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
+    # GitHub Issue 連携
+    github_issue_number: Mapped[int | None] = mapped_column(nullable=True)
+
     # カテゴリー・タグ
     category: Mapped[str | None] = mapped_column(String(100))
     subcategory: Mapped[str | None] = mapped_column(String(100))
