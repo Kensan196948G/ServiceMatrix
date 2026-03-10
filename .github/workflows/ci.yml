@@ -309,16 +309,24 @@ jobs:
       - name: Start backend server
         run: |
           uvicorn src.main:app --host 0.0.0.0 --port 8000 &
-          sleep 5
-          curl -f http://localhost:8000/api/v1/health || exit 1
+          echo "⏳ バックエンド起動待機中..."
+          for i in {1..30}; do
+            curl -sf http://localhost:8000/api/v1/health && echo "✅ バックエンド起動完了" && break
+            sleep 2
+          done
+          curl -sf http://localhost:8000/api/v1/health || exit 1
         env:
           ENVIRONMENT: test
 
       - name: Start frontend server
         run: |
           cd frontend && npm run start -- --port 3000 &
-          sleep 8
-          curl -f http://localhost:3000 || true
+          echo "⏳ フロントエンド起動待機中..."
+          for i in {1..30}; do
+            curl -sf http://localhost:3000 && echo "✅ フロントエンド起動完了" && break
+            sleep 2
+          done
+          curl -sf http://localhost:3000 || true
 
       - name: Run Playwright E2E tests
         run: cd frontend && npx playwright test --reporter=list
