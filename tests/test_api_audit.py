@@ -201,3 +201,123 @@ async def test_audit_logs_pagination(client, auth_headers, db_session):
     seqs1 = {d["sequence_number"] for d in data}
     seqs2 = {d["sequence_number"] for d in data2}
     assert seqs1.isdisjoint(seqs2)
+
+
+# ─── 統計 ────────────────────────────────────────────────────────────────────
+
+async def test_get_audit_stats_empty(client, auth_headers):
+    """GET /api/v1/audit/stats - データなし → total_operations=0"""
+    resp = await client.get("/api/v1/audit/stats", headers=auth_headers)
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "total_operations" in data
+    assert "unique_users" in data
+    assert "by_action" in data
+    assert "by_resource" in data
+    assert "recent_activity" in data
+    assert isinstance(data["total_operations"], int)
+    assert isinstance(data["unique_users"], int)
+
+
+async def test_get_audit_stats_with_data(client, auth_headers, db_session):
+    """GET /api/v1/audit/stats - データあり → 集計結果返却"""
+    _make_audit_log(db_session, seq=70001, resource_type="incident")
+    _make_audit_log(db_session, seq=70002, resource_type="change")
+    _make_audit_log(db_session, seq=70003, resource_type="incident")
+    await db_session.flush()
+
+    resp = await client.get("/api/v1/audit/stats", headers=auth_headers)
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["total_operations"] >= 3
+    assert isinstance(data["by_action"], dict)
+    assert isinstance(data["by_resource"], dict)
+    assert isinstance(data["recent_activity"], list)
+
+
+async def test_get_audit_stats_unauthorized(client):
+    """GET /api/v1/audit/stats - 認証なし → 401"""
+    resp = await client.get("/api/v1/audit/stats")
+    assert resp.status_code == 401
+
+
+# ─── CSV エクスポート ─────────────────────────────────────────────────────────
+
+async def test_export_audit_logs_csv(client, auth_headers, db_session):
+    """GET /api/v1/audit/logs/export - CSV形式でダウンロード"""
+    _make_audit_log(db_session, seq=80001, resource_type="incident", resource_id="INC-001")
+    _make_audit_log(db_session, seq=80002, resource_type="change", resource_id="CHG-001")
+    await db_session.flush()
+
+    resp = await client.get("/api/v1/audit/logs/export", headers=auth_headers)
+    assert resp.status_code == 200
+    assert "text/csv" in resp.headers.get("content-type", "")
+    content = resp.text
+    # CSVヘッダー行が含まれること
+    assert "timestamp" in content
+    assert "action" in content
+
+
+async def test_export_audit_logs_filter_by_entity_type(client, auth_headers, db_session):
+    """GET /api/v1/audit/logs/export?entity_type=incident - フィルタ付きエクスポート"""
+    _make_audit_log(db_session, seq=81001, resource_type="incident")
+    _make_audit_log(db_session, seq=81002, resource_type="problem")
+    await db_session.flush()
+
+    resp = await client.get(
+        "/api/v1/audit/logs/export",
+        params={"entity_type": "incident"},
+        headers=auth_headers,
+    )
+    assert resp.status_code == 200
+    content = resp.text
+    assert "incident" in content
+
+
+async def test_export_audit_logs_unauthorized(client):
+    """GET /api/v1/audit/logs/export - 認証なし → 401"""
+    resp = await client.get("/api/v1/audit/logs/export")
+    assert resp.status_code == 401
+
+
+async def test_verify_chain_invalid(client, auth_headers, db_session):
+    """ハッシュが不正なログ → is_valid=False"""
+    from src.models.audit import AuditLog
+
+    now = datetime.now(timezone.utc)
+    bad_log = AuditLog(
+        log_id=uuid.uuid4(),
+        created_at=now,
+        action="tampered_action",
+        prev_log_hash=None,
+        current_hash="000000000000000000000000000000000000000000000000000000000000INVALID",
+        sequence_number=90001,
+    )
+    db_session.add(bad_log)
+    await db_session.flush()
+
+    resp = await client.post(
+        "/api/v1/audit/verify-chain",
+        params={"start_seq": 90001, "end_seq": 90001},
+        headers=auth_headers,
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    # 不正ハッシュ → is_valid=False
+    assert data["is_valid"] is False
+    assert data["first_invalid_sequence"] == 90001
+
+
+async def test_list_audit_logs_unauthorized(client):
+    """GET /api/v1/audit/logs - 認証なし → 401"""
+    resp = await client.get("/api/v1/audit/logs")
+    assert resp.status_code == 401
+
+
+async def test_verify_chain_unauthorized(client):
+    """POST /api/v1/audit/verify-chain - 認証なし → 401"""
+    resp = await client.post(
+        "/api/v1/audit/verify-chain",
+        params={"start_seq": 1, "end_seq": 10},
+    )
+    assert resp.status_code == 401
