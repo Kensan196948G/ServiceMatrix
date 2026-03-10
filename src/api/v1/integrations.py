@@ -160,7 +160,8 @@ async def github_sync_status(
     current_user: Annotated[User, Depends(get_current_user)],
 ) -> dict[str, Any]:
     """ServiceMatrix ↔ GitHub Issue の同期状態を返す"""
-    rows = (await db.execute(select(Incident).where(Incident.github_issue_number.isnot(None)))).scalars().all()
+    result = await db.execute(select(Incident).where(Incident.github_issue_number.isnot(None)))
+    rows = result.scalars().all()
     return {
         "synced_incidents": len(rows),
         "items": [
@@ -191,7 +192,11 @@ async def sync_incident_to_github(
         closed = await notification_service.close_incident_github_issue(
             incident.github_issue_number, incident.incident_number
         )
-        return {"action": "closed", "github_issue_number": incident.github_issue_number, "success": closed}
+        return {
+            "action": "closed",
+            "github_issue_number": incident.github_issue_number,
+            "success": closed,
+        }
 
     if not incident.github_issue_number:
         issue_number = await notification_service.create_incident_github_issue(
