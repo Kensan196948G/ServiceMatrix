@@ -170,7 +170,7 @@ jobs:
           pip install fastapi "uvicorn[standard]" "sqlalchemy[asyncio]" alembic \
             pydantic "pydantic-settings" \
             "python-jose[cryptography]" "passlib[bcrypt]" "bcrypt>=3.2,<4.0" \
-            httpx redis structlog apscheduler \
+            httpx redis structlog apscheduler slowapi \
             pytest pytest-asyncio pytest-cov anyio "anyio[trio]" \
             aiosqlite python-multipart
 
@@ -296,7 +296,7 @@ jobs:
           pip install fastapi "uvicorn[standard]" "sqlalchemy[asyncio]" alembic \
             pydantic "pydantic-settings" \
             "python-jose[cryptography]" "passlib[bcrypt]" "bcrypt>=3.2,<4.0" \
-            httpx redis structlog apscheduler aiosqlite python-multipart
+            httpx redis structlog apscheduler slowapi aiosqlite python-multipart
 
       - name: Setup Node.js 20
         uses: actions/setup-node@v4
