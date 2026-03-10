@@ -77,8 +77,16 @@ async def process_issues_event(db: AsyncSession, payload: dict) -> dict | None:
         if incident and incident.status not in ("Resolved", "Closed"):
             incident.status = "Resolved"
             await db.commit()
-            logger.info("incident_resolved_via_github", issue_number=issue_number, incident_id=str(incident.incident_id))
-            return {"action": "incident_resolved", "issue_number": issue_number, "incident_id": str(incident.incident_id)}
+            logger.info(
+                "incident_resolved_via_github",
+                issue_number=issue_number,
+                incident_id=str(incident.incident_id),
+            )
+            return {
+                "action": "incident_resolved",
+                "issue_number": issue_number,
+                "incident_id": str(incident.incident_id),
+            }
         return {"action": "issue_closed", "issue_number": issue_number}
 
     if action in ("labeled", "unlabeled"):
@@ -95,8 +103,16 @@ async def process_issues_event(db: AsyncSession, payload: dict) -> dict | None:
                     if incident.priority != new_priority:
                         incident.priority = new_priority
                         await db.commit()
-                        logger.info("incident_priority_synced", issue_number=issue_number, priority=new_priority)
-                    return {"action": "priority_synced", "issue_number": issue_number, "priority": new_priority}
+                        logger.info(
+                            "incident_priority_synced",
+                            issue_number=issue_number,
+                            priority=new_priority,
+                        )
+                    return {
+                        "action": "priority_synced",
+                        "issue_number": issue_number,
+                        "priority": new_priority,
+                    }
         return {"action": "label_changed", "issue_number": issue_number}
 
     if action in ("assigned", "unassigned"):
