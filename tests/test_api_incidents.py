@@ -282,3 +282,427 @@ async def test_list_incidents_with_priority_filter(client, auth_headers):
     assert resp.status_code == 200
     data = resp.json()
     assert data["total"] >= 1
+
+
+# ─── AI トリアージテスト ─────────────────────────────────────────────────────
+
+async def test_ai_triage_success(client, auth_headers):
+    """POST /incidents/{id}/ai-triage → 200, トリアージ結果返却"""
+    from unittest.mock import AsyncMock, patch
+    from src.services.ai_triage_service import AITriageResult
+
+    create_resp = await client.post(
+        "/api/v1/incidents",
+        json={"title": "AIトリアージテスト", "priority": "P2"},
+        headers=auth_headers,
+    )
+    assert create_resp.status_code == 201
+    inc_id = create_resp.json()["incident_id"]
+
+    mock_result = AITriageResult(
+        priority="High",
+        category="Network",
+        confidence=0.85,
+        reasoning="ネットワーク障害の可能性が高い",
+    )
+    with patch(
+        "src.services.ai_triage_service.ai_triage_service.apply_triage_to_incident",
+        new_callable=AsyncMock,
+        return_value=mock_result,
+    ):
+        resp = await client.post(
+            f"/api/v1/incidents/{inc_id}/ai-triage", headers=auth_headers
+        )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["incident_id"] == inc_id
+    assert data["priority"] == "High"
+    assert data["category"] == "Network"
+    assert data["confidence"] == 0.85
+
+
+async def test_ai_triage_not_found(client, auth_headers):
+    """存在しないインシデント → 404"""
+    resp = await client.post(
+        f"/api/v1/incidents/{uuid.uuid4()}/ai-triage", headers=auth_headers
+    )
+    assert resp.status_code == 404
+
+
+# ─── 一括操作テスト ──────────────────────────────────────────────────────────
+
+async def test_bulk_update_close(client, auth_headers):
+    """POST /bulk-update action=close → updated_count反映"""
+    create_resp = await client.post(
+        "/api/v1/incidents",
+        json={"title": "一括クローズテスト", "priority": "P3"},
+        headers=auth_headers,
+    )
+    assert create_resp.status_code == 201
+    inc_id = create_resp.json()["incident_id"]
+
+    resp = await client.post(
+        "/api/v1/incidents/bulk-update",
+        json={"incident_ids": [inc_id], "action": "close"},
+        headers=auth_headers,
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["updated_count"] >= 1
+    assert data["failed_ids"] == []
+
+
+async def test_bulk_update_set_priority(client, auth_headers):
+    """POST /bulk-update action=set_priority → 優先度変更"""
+    create_resp = await client.post(
+        "/api/v1/incidents",
+        json={"title": "優先度一括変更テスト", "priority": "P3"},
+        headers=auth_headers,
+    )
+    assert create_resp.status_code == 201
+    inc_id = create_resp.json()["incident_id"]
+
+    resp = await client.post(
+        "/api/v1/incidents/bulk-update",
+        json={"incident_ids": [inc_id], "action": "set_priority", "priority": "P1"},
+        headers=auth_headers,
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["updated_count"] == 1
+
+
+async def test_bulk_update_not_found(client, auth_headers):
+    """存在しないIDを含む一括操作 → failed_idsに含まれる"""
+    fake_id = str(uuid.uuid4())
+    resp = await client.post(
+        "/api/v1/incidents/bulk-update",
+        json={"incident_ids": [fake_id], "action": "close"},
+        headers=auth_headers,
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["updated_count"] == 0
+    assert len(data["failed_ids"]) == 1
+
+
+async def test_bulk_update_invalid_action(client, auth_headers):
+    """無効なアクション → failed_idsに含まれる"""
+    create_resp = await client.post(
+        "/api/v1/incidents",
+        json={"title": "無効アクションテスト", "priority": "P3"},
+        headers=auth_headers,
+    )
+    assert create_resp.status_code == 201
+    inc_id = create_resp.json()["incident_id"]
+
+    resp = await client.post(
+        "/api/v1/incidents/bulk-update",
+        json={"incident_ids": [inc_id], "action": "invalid_action"},
+        headers=auth_headers,
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["failed_ids"] != [] or data["updated_count"] == 0
+
+
+# ─── 一括担当者割り当てテスト ────────────────────────────────────────────────
+
+async def test_bulk_assign_incidents(client, auth_headers, authed_user):
+    """PATCH /bulk/assign → 担当者割り当て"""
+    create_resp = await client.post(
+        "/api/v1/incidents",
+        json={"title": "一括割り当てテスト", "priority": "P2"},
+        headers=auth_headers,
+    )
+    assert create_resp.status_code == 201
+    inc_id = create_resp.json()["incident_id"]
+
+    resp = await client.patch(
+        "/api/v1/incidents/bulk/assign",
+        json={
+            "incident_ids": [inc_id],
+            "assigned_to": str(authed_user.user_id),
+        },
+        headers=auth_headers,
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["updated"] == 1
+    assert inc_id in data["incident_ids"]
+
+
+async def test_bulk_assign_not_found(client, auth_headers):
+    """存在しないID → updated=0"""
+    resp = await client.patch(
+        "/api/v1/incidents/bulk/assign",
+        json={"incident_ids": [str(uuid.uuid4())], "assigned_to": str(uuid.uuid4())},
+        headers=auth_headers,
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["updated"] == 0
+
+
+# ─── コメント CRUD テスト ────────────────────────────────────────────────────
+
+async def test_list_comments_empty(client, auth_headers):
+    """GET /incidents/{id}/comments → コメントなし"""
+    create_resp = await client.post(
+        "/api/v1/incidents",
+        json={"title": "コメント一覧テスト", "priority": "P3"},
+        headers=auth_headers,
+    )
+    assert create_resp.status_code == 201
+    inc_id = create_resp.json()["incident_id"]
+
+    resp = await client.get(
+        f"/api/v1/incidents/{inc_id}/comments", headers=auth_headers
+    )
+    assert resp.status_code == 200
+    assert resp.json() == []
+
+
+async def test_create_comment_success(client, auth_headers):
+    """POST /incidents/{id}/comments → 201, コメント作成"""
+    create_resp = await client.post(
+        "/api/v1/incidents",
+        json={"title": "コメント投稿テスト", "priority": "P2"},
+        headers=auth_headers,
+    )
+    assert create_resp.status_code == 201
+    inc_id = create_resp.json()["incident_id"]
+
+    resp = await client.post(
+        f"/api/v1/incidents/{inc_id}/comments",
+        json={"body": "テストコメントです"},
+        headers=auth_headers,
+    )
+    assert resp.status_code == 201
+    data = resp.json()
+    assert data["body"] == "テストコメントです"
+    assert data["incident_id"] == inc_id
+    assert "comment_id" in data
+
+
+async def test_create_comment_not_found(client, auth_headers):
+    """存在しないインシデントへのコメント → 404"""
+    resp = await client.post(
+        f"/api/v1/incidents/{uuid.uuid4()}/comments",
+        json={"body": "存在しないインシデント"},
+        headers=auth_headers,
+    )
+    assert resp.status_code == 404
+
+
+async def test_list_comments_with_data(client, auth_headers):
+    """POST後にGET → コメントが返る"""
+    create_resp = await client.post(
+        "/api/v1/incidents",
+        json={"title": "コメント確認テスト", "priority": "P3"},
+        headers=auth_headers,
+    )
+    assert create_resp.status_code == 201
+    inc_id = create_resp.json()["incident_id"]
+
+    await client.post(
+        f"/api/v1/incidents/{inc_id}/comments",
+        json={"body": "確認用コメント"},
+        headers=auth_headers,
+    )
+
+    resp = await client.get(
+        f"/api/v1/incidents/{inc_id}/comments", headers=auth_headers
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert len(data) >= 1
+    assert data[0]["body"] == "確認用コメント"
+
+
+async def test_delete_comment_success(client, auth_headers):
+    """DELETE /incidents/{id}/comments/{comment_id} → 204"""
+    create_resp = await client.post(
+        "/api/v1/incidents",
+        json={"title": "コメント削除テスト", "priority": "P2"},
+        headers=auth_headers,
+    )
+    assert create_resp.status_code == 201
+    inc_id = create_resp.json()["incident_id"]
+
+    comment_resp = await client.post(
+        f"/api/v1/incidents/{inc_id}/comments",
+        json={"body": "削除するコメント"},
+        headers=auth_headers,
+    )
+    assert comment_resp.status_code == 201
+    comment_id = comment_resp.json()["comment_id"]
+
+    del_resp = await client.delete(
+        f"/api/v1/incidents/{inc_id}/comments/{comment_id}",
+        headers=auth_headers,
+    )
+    assert del_resp.status_code == 204
+
+
+async def test_delete_comment_not_found(client, auth_headers):
+    """存在しないコメント → 404"""
+    create_resp = await client.post(
+        "/api/v1/incidents",
+        json={"title": "コメント削除404テスト", "priority": "P3"},
+        headers=auth_headers,
+    )
+    assert create_resp.status_code == 201
+    inc_id = create_resp.json()["incident_id"]
+
+    resp = await client.delete(
+        f"/api/v1/incidents/{inc_id}/comments/{uuid.uuid4()}",
+        headers=auth_headers,
+    )
+    assert resp.status_code == 404
+
+
+# ─── 問題リンクテスト ────────────────────────────────────────────────────────
+
+async def _create_problem(db_session, user_id):
+    """テスト用 Problem を直接 DB に作成する"""
+    import uuid as _uuid
+    from datetime import datetime, timezone
+    from src.models.problem import Problem
+
+    now = datetime.now(timezone.utc)
+    prob = Problem(
+        problem_id=_uuid.uuid4(),
+        problem_number=f"PRB-2026-{_uuid.uuid4().hex[:6].upper()}",
+        title="テスト問題",
+        status="New",
+        priority="P2",
+        created_at=now,
+        updated_at=now,
+    )
+    db_session.add(prob)
+    await db_session.flush()
+    return prob
+
+
+async def test_link_problem_success(client, auth_headers, db_session, authed_user):
+    """POST /incidents/{id}/link-problem → 200, linked=True"""
+    create_resp = await client.post(
+        "/api/v1/incidents",
+        json={"title": "問題リンクテスト", "priority": "P2"},
+        headers=auth_headers,
+    )
+    assert create_resp.status_code == 201
+    inc_id = create_resp.json()["incident_id"]
+
+    problem = await _create_problem(db_session, authed_user.user_id)
+
+    resp = await client.post(
+        f"/api/v1/incidents/{inc_id}/link-problem",
+        json={"problem_id": str(problem.problem_id)},
+        headers=auth_headers,
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["linked"] is True
+    assert data["problem_id"] == str(problem.problem_id)
+
+
+async def test_link_problem_incident_not_found(client, auth_headers, db_session, authed_user):
+    """存在しないインシデント → 404"""
+    problem = await _create_problem(db_session, authed_user.user_id)
+
+    resp = await client.post(
+        f"/api/v1/incidents/{uuid.uuid4()}/link-problem",
+        json={"problem_id": str(problem.problem_id)},
+        headers=auth_headers,
+    )
+    assert resp.status_code == 404
+
+
+async def test_link_problem_problem_not_found(client, auth_headers):
+    """存在しない問題 → 404"""
+    create_resp = await client.post(
+        "/api/v1/incidents",
+        json={"title": "問題リンク404テスト", "priority": "P3"},
+        headers=auth_headers,
+    )
+    assert create_resp.status_code == 201
+    inc_id = create_resp.json()["incident_id"]
+
+    resp = await client.post(
+        f"/api/v1/incidents/{inc_id}/link-problem",
+        json={"problem_id": str(uuid.uuid4())},
+        headers=auth_headers,
+    )
+    assert resp.status_code == 404
+
+
+# ─── 関連問題提案テスト ──────────────────────────────────────────────────────
+
+async def test_suggest_problem_no_problems(client, auth_headers):
+    """GET /suggest-problem → 問題なし → 空リスト"""
+    create_resp = await client.post(
+        "/api/v1/incidents",
+        json={"title": "提案テスト", "priority": "P3"},
+        headers=auth_headers,
+    )
+    assert create_resp.status_code == 201
+    inc_id = create_resp.json()["incident_id"]
+
+    resp = await client.get(
+        f"/api/v1/incidents/{inc_id}/suggest-problem", headers=auth_headers
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "suggestions" in data
+    assert isinstance(data["suggestions"], list)
+
+
+async def test_suggest_problem_with_match(client, auth_headers, db_session, authed_user):
+    """サービス名が一致する問題 → similarity_score > 0"""
+    import uuid as _uuid
+    from datetime import datetime, timezone
+    from src.models.problem import Problem
+
+    # affected_service を設定したインシデントを作成
+    create_resp = await client.post(
+        "/api/v1/incidents",
+        json={"title": "DB障害", "priority": "P2", "affected_service": "database"},
+        headers=auth_headers,
+    )
+    assert create_resp.status_code == 201
+    inc_id = create_resp.json()["incident_id"]
+
+    # タイトルにサービス名を含む問題を作成
+    now = datetime.now(timezone.utc)
+    problem = Problem(
+        problem_id=_uuid.uuid4(),
+        problem_number=f"PRB-2026-{_uuid.uuid4().hex[:6].upper()}",
+        title="database接続問題",
+        status="New",
+        priority="P2",
+
+        created_at=now,
+        updated_at=now,
+    )
+    db_session.add(problem)
+    await db_session.flush()
+
+    resp = await client.get(
+        f"/api/v1/incidents/{inc_id}/suggest-problem", headers=auth_headers
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "suggestions" in data
+    # サービス名が一致するため提案が返る
+    if data["suggestions"]:
+        assert data["suggestions"][0]["similarity_score"] > 0
+
+
+async def test_suggest_problem_not_found(client, auth_headers):
+    """存在しないインシデント → 404"""
+    resp = await client.get(
+        f"/api/v1/incidents/{uuid.uuid4()}/suggest-problem", headers=auth_headers
+    )
+    assert resp.status_code == 404

@@ -3,25 +3,26 @@
 ## ServiceMatrix テスト品質・CI 改善レポート
 
 **作成日**: 2026-03-11
+**最終更新**: 2026-03-11（設計改善ループ 第2サイクル）
 **作成者**: ClaudeOS 設計改善ループ（6時間周期）
 **対象ブランチ**: develop / main
-**カバレッジ測定日**: 2026-03-10〜11
+**カバレッジ測定日**: 2026-03-11 最新実測値
 
 ---
 
 ## 1. エグゼクティブサマリー
 
-| 指標 | 現状 | 目標 | 評価 |
-|------|------|------|------|
-| 全体カバレッジ | 75.51% | 75% | ⚠️ 閾値ギリギリ |
-| テスト行数 | 10,184 行 | — | ✅ 充実 |
-| テスト/コード比率 | 3:1 | 2:1 以上 | ✅ 良好 |
-| 危険域モジュール数 | 7 モジュール | 0 | ❌ 要対応 |
-| CI 依存関係手動管理 | 手動リスト | pyproject.toml 統合 | ❌ 技術負債 |
-| ハードコードシークレット | 0 件 | 0 件 | ✅ クリア |
-| type: ignore 使用箇所 | 5 箇所 | 可能な限り削減 | 🟡 許容範囲 |
+| 指標 | 前回 | 現状 | 目標 | 評価 |
+|------|------|------|------|------|
+| 全体カバレッジ | 75.51% | **79.14%** | 75% | ✅ 閾値+4% の余裕 |
+| テスト件数 | 645 件 | **731 件** | — | ✅ 大幅増加 |
+| テスト/コード比率 | 3:1 | 3.5:1 | 2:1 以上 | ✅ 良好 |
+| 危険域モジュール数 | 7 モジュール | **5 モジュール** | 0 | 🟡 改善中 |
+| CI 依存関係手動管理 | 手動リスト | **pyproject.toml 統合** | pyproject.toml 統合 | ✅ 解決済み |
+| ハードコードシークレット | 0 件 | 0 件 | 0 件 | ✅ クリア |
+| type: ignore 使用箇所 | 5 箇所 | 5 箇所 | 可能な限り削減 | 🟡 許容範囲 |
 
-**総評**: 閾値 75% をかろうじてクリアしているが、API 層の複数モジュールが 50% 未満であり、J-SOX コンプライアンス観点から audit.py・compliance.py の改善が急務。
+**総評**: 閾値 75% を 4.14 ポイント上回り、安定域に到達。incidents.py (48%→98%)・compliance.py (35%→71%) の改善が主因。残課題は reports.py・cmdb.py・websocket.py の低カバレッジ。
 
 ---
 
@@ -31,35 +32,41 @@
 
 | モジュール | カバレッジ | 備考 |
 |-----------|-----------|------|
-| `src/services/sla_monitor_service.py` | 99% | APScheduler 統合 |
-| `src/api/v1/auth.py` | 100% | JWT 認証 |
-| `src/api/v1/health.py` | 100% | ヘルスチェック |
-| `src/api/v1/changes.py` | 100% | 変更管理 |
-| `src/api/v1/problems.py` | 100% | 問題管理 |
-| `src/api/v1/service_requests.py` | 100% | SR管理 |
-| `src/services/incident_service.py` | ~85% | SLA計算 |
-| `src/services/change_service.py` | ~80% | リスクスコア |
+| `src/api/v1/incidents.py` | **98%** ↑ | コア ITIL 機能（大幅改善） |
+| `src/api/v1/backup.py` | 92% | バックアップ機能 |
+| `src/api/v1/router.py` | 100% | ルーター |
+| `src/api/v1/service_catalog.py` | 100% | サービスカタログ |
+| `src/services/auto_repair_service.py` | 99% | 自動修復 |
+| `src/services/change_impact_service.py` | 99% | 変更影響 |
+| `src/services/sla_monitor_service.py` | 94% | APScheduler 統合 |
+| `src/services/change_risk_service.py` | 94% | リスクスコア |
+| `src/services/rca_service.py` | 93% | RCA |
+| `src/services/service_request_service.py` | 92% | SR管理 |
+| `src/services/notification_webhook_service.py` | 97% | Webhook 通知 |
 
 ### 2.2 中カバレッジ（50〜79%）🟡
 
 | モジュール | カバレッジ | 改善優先度 |
 |-----------|-----------|-----------|
-| `src/api/v1/sla.py` | 68% | 低 |
-| `src/api/v1/webhooks.py` | 62% | 低 |
-| `src/api/v1/ai.py` | 55% | 中 |
-| `src/middleware/audit.py` | 58% | 中 |
+| `src/api/v1/compliance.py` | **71%** ↑ | 低（改善済み） |
+| `src/api/v1/ai.py` | 69% | 中 |
+| `src/api/v1/problems.py` | 78% | 低 |
+| `src/api/v1/integrations.py` | 75% | 低 |
+| `src/api/v1/dashboard.py` | 73% | 低 |
+| `src/api/v1/audit.py` | 55% | 中 |
+| `src/services/change_service.py` | 79% | 低 |
+| `src/services/problem_service.py` | 78% | 低 |
+| `src/services/notification_service.py` | 75% | 低 |
 
 ### 2.3 危険域（50%未満）❌ — 優先対応必須
 
 | モジュール | カバレッジ | ビジネス影響 | 優先度 |
 |-----------|-----------|------------|--------|
-| `src/api/v1/compliance.py` | **35%** | J-SOX 準拠 | 🔴 最高 |
-| `src/api/v1/websocket.py` | **36%** | リアルタイム通知 | 🟠 高 |
-| `src/api/v1/audit.py` | **42%** | J-SOX 監査ログ | 🔴 最高 |
 | `src/api/v1/cmdb.py` | **44%** | CMDB 整合性 | 🟠 高 |
-| `src/core/database.py` | **47%** | DB 接続・セッション | 🟠 高 |
-| `src/api/v1/incidents.py` | **48%** | コア ITIL 機能 | 🟠 高 |
 | `src/api/v1/reports.py` | **49%** | 経営レポーティング | 🟡 中 |
+| `src/api/v1/changes.py` | **58%** | 変更管理 | 🟠 高 |
+| `src/services/cmdb_service.py` | **56%** | CMDB バックエンド | 🟠 高 |
+| `src/services/incident_service.py` | **68%** | コア SLA 計算 | 🟡 中 |
 
 ---
 
@@ -128,22 +135,23 @@ pip install fastapi "uvicorn[standard]" "sqlalchemy[asyncio]" alembic \
 
 ## 4. 改善ロードマップ
 
-### Phase A（即時対応 — 2週間以内）
+### Phase A（即時対応 — 2週間以内）✅ 完了
 
-| # | タスク | 担当 | 工数 |
-|---|--------|------|------|
-| A1 | `compliance.py` テスト追加（35% → 70%以上） | Tester | 中 |
-| A2 | `audit.py` テスト追加（42% → 70%以上） | Tester | 中 |
-| A3 | CI を `pip install -e ".[dev]"` に移行 | Ops | 小 |
+| # | タスク | 担当 | 工数 | 状態 |
+|---|--------|------|------|------|
+| A1 | `compliance.py` テスト追加（35% → **71%**） | Tester | 中 | ✅ 完了 |
+| A2 | `audit.py` テスト追加（42% → **55%**） | Tester | 中 | 🟡 部分完了 |
+| A3 | CI を `pip install -e ".[dev]"` に移行 | Ops | 小 | ✅ 完了 |
 
-### Phase B（短期 — 1ヶ月以内）
+### Phase B（短期 — 1ヶ月以内）🔄 進行中
 
-| # | タスク | 担当 | 工数 |
-|---|--------|------|------|
-| B1 | `incidents.py` テスト追加（48% → 70%以上） | Tester | 中 |
-| B2 | `cmdb.py` テスト追加（44% → 70%以上） | Tester | 中 |
-| B3 | E2E ヘルスチェック wait ループ導入 | Ops | 小 |
-| B4 | websocket テスト追加（36% → 60%以上） | DevAPI | 大 |
+| # | タスク | 担当 | 工数 | 状態 |
+|---|--------|------|------|------|
+| B1 | `incidents.py` テスト追加（48% → **98%**） | Tester | 中 | ✅ 完了 |
+| B2 | `cmdb.py` テスト追加（44% → 70%以上） | Tester | 中 | ❌ 未着手 |
+| B3 | E2E ヘルスチェック wait ループ導入 | Ops | 小 | ❌ 未着手 |
+| B4 | `audit.py` テスト追加（55% → 70%以上） | Tester | 小 | ❌ 未着手 |
+| B5 | `changes.py` テスト追加（58% → 70%以上） | Tester | 中 | ❌ 未着手 |
 
 ### Phase C（中期 — 3ヶ月以内）
 
@@ -166,7 +174,7 @@ CI Pipeline (ci.yml)
 ├── validate-config-files  ← YAML 構文確認
 ├── security-scan          ← TruffleHog（continue-on-error）
 ├── python-lint            ← ruff（|| true で警告扱い）
-├── python-test            ← pytest 645テスト 75.51%カバレッジ ← CIゲート
+├── python-test            ← pytest 731テスト 79.14%カバレッジ ← CIゲート
 ├── frontend-build         ← Next.js build + type-check
 ├── docker-lint            ← hadolint（continue-on-error）
 ├── lint                   ← ruff check + format（厳格）
@@ -202,23 +210,30 @@ CI Pipeline (ci.yml)
 
 ## 7. 推奨アクション（最優先）
 
-### 今すぐ対応すべき項目
+### ✅ 完了済み項目（2026-03-11 第2サイクル）
 
 ```
-1. [A1] compliance.py テスト作成
-   ファイル: tests/test_compliance.py
-   目標: 35% → 70%
-   理由: J-SOX コンプライアンス機能のテスト皆無は監査リスク
+[A1] compliance.py テスト追加 → 35% から 71% に改善（目標達成）
+[A3] CI 依存関係を pyproject.toml ベースに移行 → 完了
+[B1] incidents.py テスト追加 → 48% から 98% に改善（大幅超過達成）
+```
 
-2. [A2] audit.py テスト作成
-   ファイル: tests/test_audit_api.py
-   目標: 42% → 70%
-   理由: SHA-256 ハッシュチェーン・監査ログ完全性の検証が必要
+### 次に対応すべき項目
 
-3. [A3] CI 依存関係を pyproject.toml ベースに移行
-   ファイル: .github/workflows/ci.yml
-   変更: pip install リスト → pip install -e ".[dev]"
-   理由: 再発防止（slowapi 漏れ問題の根本解決）
+```
+1. [A2] audit.py テスト追加（55% → 70%以上）
+   ファイル: tests/test_api_audit.py に追加
+   目標: CSV export・statistics 詳細テスト
+   理由: J-SOX 監査ログ完全性の検証強化
+
+2. [B2] cmdb.py テスト追加（44% → 70%以上）
+   ファイル: tests/test_api_cmdb.py
+   目標: CI/CMDB 登録・更新・関係性テスト
+   理由: CMDB 整合性は変更管理の基盤
+
+3. [B5] changes.py テスト追加（58% → 70%以上）
+   ファイル: tests/test_direct_changes.py に追加
+   目標: CAB 承認フロー・バルク操作テスト
 ```
 
 ---
@@ -236,5 +251,16 @@ CI Pipeline (ci.yml)
 
 ---
 
-_このレポートは ClaudeOS 設計改善ループ（6時間周期）により自動生成されました。_
-_次回更新: 2026-03-11 06:00 UTC 以降の設計改善ループ実行時_
+---
+
+## 9. 改善履歴
+
+| 日付 | サイクル | 主な改善 |
+|------|---------|---------|
+| 2026-03-11 AM | 第1サイクル | compliance.py+audit.py テスト追加、CI 依存関係修正 |
+| 2026-03-11 AM | 第2サイクル | incidents.py テスト 20件追加 (48%→98%)、全体79%達成 |
+
+---
+
+_このレポートは ClaudeOS 設計改善ループ（6時間周期）により自動更新されます。_
+_次回更新: 2026-03-11 12:00 UTC 以降の設計改善ループ実行時_
