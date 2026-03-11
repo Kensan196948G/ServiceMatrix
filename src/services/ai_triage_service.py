@@ -81,6 +81,15 @@ class KeywordTriageProvider(TriageProvider):
         return "Unknown", "No category keywords matched"
 
 
+_TRIAGE_PROMPT = (
+    "Triage this IT incident. Title: {title}. Description: {description}.\n"
+    "Respond ONLY in JSON: "
+    '{{"priority": "Critical|High|Medium|Low", '
+    '"category": "Network|Database|Application|Security|Infrastructure|Unknown", '
+    '"confidence": 0.0-1.0, "reasoning": "string"}}'
+)
+
+
 class OpenAITriageProvider(TriageProvider):
     """OpenAI API使用トリアージ（openai_api_keyが設定されている場合に使用）"""
 
@@ -91,6 +100,8 @@ class OpenAITriageProvider(TriageProvider):
 
     async def analyze(self, title: str, description: str | None) -> AITriageResult:
         try:
+            import json  # noqa: PLC0415
+
             import openai  # noqa: PLC0415
 
             client_kwargs: dict = {"api_key": self.api_key}
@@ -98,19 +109,12 @@ class OpenAITriageProvider(TriageProvider):
                 client_kwargs["base_url"] = self.api_base
             client = openai.AsyncOpenAI(**client_kwargs)
 
-            prompt = (
-                f"Triage this incident. Title: {title}. Description: {description or ''}.\n"
-                "Respond in JSON: {priority: Critical|High|Medium|Low, "
-                "category: Network|Database|Application|Security|Infrastructure|Unknown, "
-                "confidence: 0.0-1.0, reasoning: string}"
-            )
+            prompt = _TRIAGE_PROMPT.format(title=title, description=description or "")
             response = await client.chat.completions.create(
                 model=self.model,
                 messages=[{"role": "user", "content": prompt}],
                 response_format={"type": "json_object"},
             )
-            import json  # noqa: PLC0415
-
             data = json.loads(response.choices[0].message.content or "{}")
             return AITriageResult(
                 priority=data.get("priority", "Medium"),
@@ -123,15 +127,68 @@ class OpenAITriageProvider(TriageProvider):
             return await KeywordTriageProvider().analyze(title, description)
 
 
+class OllamaTriageProvider(TriageProvider):
+    """Ollamaローカルモデル使用トリアージ（オンプレミスLLM・APIキー不要）"""
+
+    DEFAULT_BASE_URL = "http://localhost:11434/v1"
+    DEFAULT_MODEL = "llama3.2"
+
+    def __init__(self, base_url: str = DEFAULT_BASE_URL, model: str = DEFAULT_MODEL):
+        self.base_url = base_url
+        self.model = model
+
+    async def analyze(self, title: str, description: str | None) -> AITriageResult:
+        try:
+            import json  # noqa: PLC0415
+
+            import openai  # noqa: PLC0415
+
+            # Ollamaは空のapi_keyを受け付けるがrequiredなため"ollama"を渡す
+            client = openai.AsyncOpenAI(api_key="ollama", base_url=self.base_url)
+            prompt = _TRIAGE_PROMPT.format(title=title, description=description or "")
+
+            # Ollamaはresponse_format未対応モデルがあるためplain textでリクエスト
+            response = await client.chat.completions.create(
+                model=self.model,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": "You are an IT incident triage assistant. Always respond with valid JSON.",
+                    },
+                    {"role": "user", "content": prompt},
+                ],
+            )
+            content = response.choices[0].message.content or "{}"
+            # JSON抽出: モデルがMarkdownコードブロックで返す場合に対応
+            if "```" in content:
+                content = content.split("```")[1].lstrip("json").strip()
+            data = json.loads(content)
+            return AITriageResult(
+                priority=data.get("priority", "Medium"),
+                category=data.get("category", "Unknown"),
+                confidence=float(data.get("confidence", 0.5)),
+                reasoning=data.get("reasoning", "Ollama LLM triage"),
+            )
+        except ImportError:
+            logger.warning("openai package not installed; falling back to keyword triage")
+            return await KeywordTriageProvider().analyze(title, description)
+        except Exception as e:
+            logger.warning("Ollama triage failed (%s); falling back to keyword triage", e)
+            return await KeywordTriageProvider().analyze(title, description)
+
+
 def get_triage_provider() -> TriageProvider:
     """設定に基づいてプロバイダーを返すファクトリ関数"""
     provider = settings.llm_provider
     if provider == "openai" and settings.openai_api_key:
         return OpenAITriageProvider(settings.openai_api_key, settings.llm_model)
-    if provider in ("azure_openai", "ollama") and settings.openai_api_base:
+    if provider == "azure_openai" and settings.openai_api_base:
         return OpenAITriageProvider(
             settings.openai_api_key, settings.llm_model, settings.openai_api_base
         )
+    if provider == "ollama":
+        base_url = settings.openai_api_base or OllamaTriageProvider.DEFAULT_BASE_URL
+        return OllamaTriageProvider(base_url=base_url, model=settings.llm_model)
     return KeywordTriageProvider()
 
 

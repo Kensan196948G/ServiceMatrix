@@ -335,3 +335,122 @@ async def test_apply_triage_to_incident_found_updates_notes():
     assert inc_mock.ai_triage_notes is not None
     assert "Priority=High" in inc_mock.ai_triage_notes
     db.flush.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_ollama_provider_analyze_success():
+    """OllamaTriageProvider: 正常系 → Ollamaからレスポンスを受けてトリアージ結果を返す"""
+    from src.services.ai_triage_service import OllamaTriageProvider
+
+    provider = OllamaTriageProvider(base_url="http://localhost:11434/v1", model="llama3.2")
+
+    mock_response = MagicMock()
+    mock_response.choices[0].message.content = (
+        '{"priority": "High", "category": "Network", "confidence": 0.78, "reasoning": "network timeout"}'
+    )
+
+    mock_client = AsyncMock()
+    mock_client.chat.completions.create = AsyncMock(return_value=mock_response)
+
+    mock_openai_module = MagicMock()
+    mock_openai_module.AsyncOpenAI = MagicMock(return_value=mock_client)
+
+    import sys
+    with patch.dict(sys.modules, {"openai": mock_openai_module}):
+        result = await provider.analyze("ネットワーク接続障害", "タイムアウト多発")
+
+    assert result.priority == "High"
+    assert result.category == "Network"
+    assert result.confidence == 0.78
+
+
+@pytest.mark.asyncio
+async def test_ollama_provider_analyze_with_markdown_json():
+    """OllamaTriageProvider: Markdownコードブロック形式のレスポンス → JSON抽出して解析"""
+    from src.services.ai_triage_service import OllamaTriageProvider
+
+    provider = OllamaTriageProvider()
+
+    mock_response = MagicMock()
+    mock_response.choices[0].message.content = (
+        "```json\n"
+        '{"priority": "Critical", "category": "Database", "confidence": 0.95, "reasoning": "db down"}'
+        "\n```"
+    )
+
+    mock_client = AsyncMock()
+    mock_client.chat.completions.create = AsyncMock(return_value=mock_response)
+
+    mock_openai_module = MagicMock()
+    mock_openai_module.AsyncOpenAI = MagicMock(return_value=mock_client)
+
+    import sys
+    with patch.dict(sys.modules, {"openai": mock_openai_module}):
+        result = await provider.analyze("DB停止", None)
+
+    assert result.priority == "Critical"
+    assert result.category == "Database"
+
+
+@pytest.mark.asyncio
+async def test_ollama_provider_analyze_exception_fallback():
+    """OllamaTriageProvider: 例外発生 → キーワードトリアージにフォールバック"""
+    from src.services.ai_triage_service import OllamaTriageProvider
+
+    provider = OllamaTriageProvider()
+
+    mock_client = AsyncMock()
+    mock_client.chat.completions.create = AsyncMock(side_effect=Exception("connection refused"))
+
+    mock_openai_module = MagicMock()
+    mock_openai_module.AsyncOpenAI = MagicMock(return_value=mock_client)
+
+    import sys
+    with patch.dict(sys.modules, {"openai": mock_openai_module}):
+        result = await provider.analyze("緊急: サーバー停止", "本番環境でoutage発生")
+
+    # フォールバック後もキーワードマッチで Critical になる
+    assert result.priority == "Critical"
+
+
+@pytest.mark.asyncio
+async def test_ollama_provider_import_error_fallback():
+    """OllamaTriageProvider: openai未インストール → キーワードトリアージにフォールバック"""
+    from src.services.ai_triage_service import OllamaTriageProvider
+
+    provider = OllamaTriageProvider()
+
+    import sys
+    with patch.dict(sys.modules, {"openai": None}):
+        result = await provider.analyze("network error", None)
+
+    assert result.priority in ("High", "Medium", "Low", "Critical")
+
+
+def test_get_triage_provider_ollama():
+    """get_triage_provider: llm_provider=ollama → OllamaTriageProvider を返す"""
+    from src.services.ai_triage_service import OllamaTriageProvider, get_triage_provider
+
+    with patch("src.services.ai_triage_service.settings") as mock_settings:
+        mock_settings.llm_provider = "ollama"
+        mock_settings.openai_api_base = "http://localhost:11434/v1"
+        mock_settings.llm_model = "llama3.2"
+        provider = get_triage_provider()
+
+    assert isinstance(provider, OllamaTriageProvider)
+    assert provider.base_url == "http://localhost:11434/v1"
+    assert provider.model == "llama3.2"
+
+
+def test_get_triage_provider_ollama_default_url():
+    """get_triage_provider: ollama + base_url未設定 → デフォルトURL使用"""
+    from src.services.ai_triage_service import OllamaTriageProvider, get_triage_provider
+
+    with patch("src.services.ai_triage_service.settings") as mock_settings:
+        mock_settings.llm_provider = "ollama"
+        mock_settings.openai_api_base = ""
+        mock_settings.llm_model = "llama3.2"
+        provider = get_triage_provider()
+
+    assert isinstance(provider, OllamaTriageProvider)
+    assert provider.base_url == OllamaTriageProvider.DEFAULT_BASE_URL

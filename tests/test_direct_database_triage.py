@@ -216,8 +216,8 @@ async def test_find_similar_incidents_limit_applied():
 
 
 async def test_find_similar_incidents_openai_api_base_branch():
-    """get_triage_provider: ollama + openai_api_base → OpenAITriageProvider（line 131-134）"""
-    from src.services.ai_triage_service import OpenAITriageProvider, get_triage_provider
+    """get_triage_provider: ollama + openai_api_base → OllamaTriageProvider（設計改善: Ollama専用クラス分離）"""
+    from src.services.ai_triage_service import OllamaTriageProvider, get_triage_provider
 
     with patch("src.services.ai_triage_service.settings") as mock_settings:
         mock_settings.llm_provider = "ollama"
@@ -227,5 +227,5 @@ async def test_find_similar_incidents_openai_api_base_branch():
 
         provider = get_triage_provider()
 
-    assert isinstance(provider, OpenAITriageProvider)
-    assert provider.api_base == "http://localhost:11434/v1"
+    assert isinstance(provider, OllamaTriageProvider)
+    assert provider.base_url == "http://localhost:11434/v1"
