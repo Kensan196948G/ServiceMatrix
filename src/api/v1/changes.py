@@ -61,7 +61,7 @@ async def list_changes(
 
     query = query.offset((page - 1) * size).limit(size).order_by(Change.created_at.desc())
     result = await db.execute(query)
-    items = list(result.scalars().all())
+    items = [ChangeResponse.model_validate(item) for item in result.scalars().all()]
 
     response_data = PaginatedResponse(
         items=items,

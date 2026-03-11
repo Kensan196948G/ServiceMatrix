@@ -4,6 +4,8 @@ import json
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
+PROJECT_ROOT = Path(__file__).parent.parent
+
 import pytest
 
 
@@ -112,7 +114,7 @@ async def test_cache_invalidation_on_create() -> None:
 # ---------------------------------------------------------------------------
 def test_db_pool_config() -> None:
     """database.py の engine が pool_size=20, max_overflow=40 で設定されていること"""
-    db_path = Path("/mnt/LinuxHDD/worktree-issue49-perf/src/core/database.py")
+    db_path = PROJECT_ROOT / "src/core/database.py"
     content = db_path.read_text()
     assert "pool_size" in content
     assert '"pool_size": 20' in content or "'pool_size': 20" in content
@@ -125,9 +127,7 @@ def test_db_pool_config() -> None:
 # ---------------------------------------------------------------------------
 def test_performance_index_migration_exists() -> None:
     """014_add_performance_indexes.py が存在し、必要なインデックス定義を含む"""
-    migration_path = Path(
-        "/mnt/LinuxHDD/worktree-issue49-perf/alembic/versions/014_add_performance_indexes.py"
-    )
+    migration_path = PROJECT_ROOT / "alembic/versions/014_add_performance_indexes.py"
     assert migration_path.exists(), "マイグレーションファイルが存在しません"
 
     content = migration_path.read_text()

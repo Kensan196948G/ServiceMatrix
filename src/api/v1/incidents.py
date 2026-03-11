@@ -70,7 +70,7 @@ async def list_incidents(
 
     query = query.offset((page - 1) * size).limit(size).order_by(Incident.created_at.desc())
     result = await db.execute(query)
-    items = list(result.scalars().all())
+    items = [IncidentResponse.model_validate(item) for item in result.scalars().all()]
 
     response_data = PaginatedResponse(
         items=items,
