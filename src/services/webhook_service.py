@@ -4,8 +4,10 @@ import hashlib
 import hmac
 
 import structlog
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.models.incident import Incident
 from src.services import incident_service
 
 logger = structlog.get_logger()
@@ -67,7 +69,54 @@ async def process_issues_event(db: AsyncSession, payload: dict) -> dict | None:
         }
 
     if action == "closed":
+        # GitHub Issueクローズ → 対応するIncidentをResolvedに更新
+        result = await db.execute(
+            select(Incident).where(Incident.github_issue_number == issue_number)
+        )
+        incident = result.scalar_one_or_none()
+        if incident and incident.status not in ("Resolved", "Closed"):
+            incident.status = "Resolved"
+            await db.commit()
+            logger.info(
+                "incident_resolved_via_github",
+                issue_number=issue_number,
+                incident_id=str(incident.incident_id),
+            )
+            return {
+                "action": "incident_resolved",
+                "issue_number": issue_number,
+                "incident_id": str(incident.incident_id),
+            }
         return {"action": "issue_closed", "issue_number": issue_number}
+
+    if action in ("labeled", "unlabeled"):
+        # ラベル変更 → Incidentの優先度を同期
+        result = await db.execute(
+            select(Incident).where(Incident.github_issue_number == issue_number)
+        )
+        incident = result.scalar_one_or_none()
+        if incident:
+            labels = [lbl.get("name", "") for lbl in issue.get("labels", [])]
+            for label in labels:
+                if label in GITHUB_ISSUE_PRIORITY_MAP:
+                    new_priority = GITHUB_ISSUE_PRIORITY_MAP[label]
+                    if incident.priority != new_priority:
+                        incident.priority = new_priority
+                        await db.commit()
+                        logger.info(
+                            "incident_priority_synced",
+                            issue_number=issue_number,
+                            priority=new_priority,
+                        )
+                    return {
+                        "action": "priority_synced",
+                        "issue_number": issue_number,
+                        "priority": new_priority,
+                    }
+        return {"action": "label_changed", "issue_number": issue_number}
+
+    if action in ("assigned", "unassigned"):
+        return {"action": "assignment_changed", "issue_number": issue_number}
 
     return None
 

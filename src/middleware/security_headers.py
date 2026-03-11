@@ -1,4 +1,4 @@
-"""セキュリティヘッダー設定ミドルウェア"""
+"""セキュリティヘッダー設定ミドルウェア - OWASP Top 10 A05対応"""
 
 from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -7,6 +7,8 @@ from starlette.middleware.base import BaseHTTPMiddleware
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         response = await call_next(request)
+        # OWASP A05: Security Misconfiguration - セキュリティヘッダー強化
+        response.headers["Content-Security-Policy"] = "default-src 'self'"
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["X-Frame-Options"] = "DENY"
         response.headers["X-XSS-Protection"] = "1; mode=block"

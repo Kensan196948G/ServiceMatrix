@@ -119,12 +119,16 @@ async def test_process_issues_opened_priority_default():
 
 @pytest.mark.anyio
 async def test_process_issues_closed():
-    """issues.closedでissue_closedレスポンス"""
+    """issues.closedで対応Incidentなしの場合issue_closedレスポンス"""
     payload = {
         "action": "closed",
         "issue": {"number": 55, "title": "Old issue", "body": "", "labels": []},
     }
+    from unittest.mock import MagicMock
     mock_db = AsyncMock()
+    execute_result = MagicMock()
+    execute_result.scalar_one_or_none.return_value = None
+    mock_db.execute.return_value = execute_result
     result = await process_issues_event(mock_db, payload)
     assert result == {"action": "issue_closed", "issue_number": 55}
 

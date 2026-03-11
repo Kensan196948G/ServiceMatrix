@@ -68,6 +68,8 @@ coverage/
 .nyc_output/
 htmlcov/
 .coverage
+coverage.json
+coverage.xml
 .tox/
 
 # Temporary files
@@ -83,4 +85,3 @@ next-env.d.ts
 
 # Claude Code
 .claude/
-coverage.xml

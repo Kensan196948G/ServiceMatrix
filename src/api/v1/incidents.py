@@ -1,14 +1,17 @@
 """インシデント管理API - CRUD + ステータス遷移 + SLA"""
 
+import json
 import uuid
 from typing import Annotated
 
 import pydantic
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
+from fastapi.encoders import jsonable_encoder
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
+from src.core.cache import cache_delete_pattern, cache_get, cache_set
 from src.core.database import get_db
 from src.middleware.rbac import get_current_user, require_role
 from src.models.incident import Incident
@@ -49,6 +52,11 @@ async def list_incidents(
     department: str | None = Query(default=None),
 ):
     """インシデント一覧取得（ページネーション）"""
+    cache_key = f"incidents:list:{page}:{size}:{status_filter}:{priority}:{department}"
+    cached = await cache_get(cache_key)
+    if cached is not None:
+        return json.loads(cached)
+
     query = select(Incident)
     if status_filter:
         query = query.where(Incident.status == status_filter)
@@ -62,15 +70,17 @@ async def list_incidents(
 
     query = query.offset((page - 1) * size).limit(size).order_by(Incident.created_at.desc())
     result = await db.execute(query)
-    items = list(result.scalars().all())
+    items = [IncidentResponse.model_validate(item) for item in result.scalars().all()]
 
-    return PaginatedResponse(
+    response_data = PaginatedResponse(
         items=items,
         total=total,
         page=page,
         size=size,
         pages=(total + size - 1) // size,
     )
+    await cache_set(cache_key, json.dumps(jsonable_encoder(response_data)), ttl=60)
+    return response_data
 
 
 @router.post(
@@ -101,6 +111,7 @@ async def create_incident(
     background_tasks.add_task(
         ai_triage_service.apply_triage_to_incident, db, str(incident.incident_id)
     )
+    await cache_delete_pattern("incidents:list:*")
     return incident
 
 
@@ -159,6 +170,7 @@ async def update_incident(
         setattr(incident, field, value)
     await db.flush()
     await db.refresh(incident)
+    await cache_delete_pattern("incidents:list:*")
     return incident
 
 

@@ -67,11 +67,12 @@ async def authed_user(db_session):
     import uuid as _uuid
     from src.models.user import User, UserRole
 
+    uid = _uuid.uuid4()
     now = datetime.now(timezone.utc)
     user = User(
-        user_id=_uuid.uuid4(),
-        username="test_admin",
-        email="admin@test.com",
+        user_id=uid,
+        username=f"test_admin_{uid.hex[:8]}",
+        email=f"admin_{uid.hex[:8]}@test.com",
         hashed_password="fakehash",
         role=UserRole.SYSTEM_ADMIN,
         is_active=True,

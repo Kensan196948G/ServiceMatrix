@@ -1,4 +1,7 @@
-"""Redis キャッシュユーティリティ"""
+"""Redis キャッシュユーティリティ + インメモリTTLキャッシュ"""
+
+import time
+from typing import Any
 
 import redis.asyncio as aioredis  # type: ignore[import-untyped]
 import structlog
@@ -6,6 +9,36 @@ import structlog
 from src.core.config import settings
 
 logger = structlog.get_logger(__name__)
+
+
+class TTLCache:
+    """スレッドセーフなTTLキャッシュ（インメモリ）"""
+
+    def __init__(self, ttl: int = 60):
+        self.ttl = ttl
+        self._store: dict[str, tuple[Any, float]] = {}
+
+    def get(self, key: str) -> Any | None:
+        if key in self._store:
+            value, expires_at = self._store[key]
+            if time.time() < expires_at:
+                return value
+            del self._store[key]
+        return None
+
+    def set(self, key: str, value: Any) -> None:
+        self._store[key] = (value, time.time() + self.ttl)
+
+    def invalidate(self, key: str) -> None:
+        self._store.pop(key, None)
+
+    def clear(self) -> None:
+        self._store.clear()
+
+
+# アプリケーション全体で共有するキャッシュインスタンス
+incident_cache = TTLCache(ttl=60)
+change_cache = TTLCache(ttl=60)
 
 _redis_client: aioredis.Redis | None = None
 

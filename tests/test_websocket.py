@@ -2,10 +2,12 @@
 
 import pytest
 import pytest_asyncio
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 from httpx import AsyncClient, ASGITransport
+from fastapi import WebSocketDisconnect
 
 from src.services.notification_manager import ConnectionManager
+from src.api.v1.websocket import websocket_endpoint
 from src.main import app
 
 
@@ -127,3 +129,137 @@ async def test_ws_stats_endpoint():
     data = response.json()
     assert "total" in data
     assert "channels" in data
+
+
+# ─── websocket_endpoint 単体テスト ──────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_websocket_endpoint_invalid_channel():
+    """無効なチャンネル指定 → 4004 でクローズ"""
+    ws = AsyncMock()
+    await websocket_endpoint(ws, "invalid_channel", "some_token")
+    ws.close.assert_called_once_with(code=4004)
+
+
+@pytest.mark.asyncio
+async def test_websocket_endpoint_invalid_token():
+    """無効な JWT → 4001 でクローズ"""
+    ws = AsyncMock()
+    with patch("src.api.v1.websocket.decode_token", side_effect=Exception("bad token")):
+        await websocket_endpoint(ws, "incidents", "bad_jwt")
+    ws.close.assert_called_once_with(code=4001)
+
+
+@pytest.mark.asyncio
+async def test_websocket_endpoint_client_ping_pong():
+    """クライアントから ping を受信してサーバーが pong を返す"""
+    ws = AsyncMock()
+    calls = [0]
+
+    async def mock_wait_for(coro, timeout):
+        try:
+            coro.close()
+        except Exception:
+            pass
+        calls[0] += 1
+        if calls[0] == 1:
+            return "ping"
+        raise WebSocketDisconnect()
+
+    with patch("src.api.v1.websocket.decode_token", return_value={"sub": "user1"}):
+        with patch("src.api.v1.websocket.asyncio.wait_for", new=mock_wait_for):
+            await websocket_endpoint(ws, "incidents", "valid_token")
+
+    ws.accept.assert_called_once()
+    ws.send_text.assert_any_call("pong")
+
+
+@pytest.mark.asyncio
+async def test_websocket_endpoint_server_keepalive_ping():
+    """タイムアウト時にサーバーが keepalive ping を送信する"""
+    ws = AsyncMock()
+    calls = [0]
+
+    async def mock_wait_for(coro, timeout):
+        try:
+            coro.close()
+        except Exception:
+            pass
+        calls[0] += 1
+        if calls[0] == 1:
+            raise TimeoutError()
+        raise WebSocketDisconnect()
+
+    with patch("src.api.v1.websocket.decode_token", return_value={"sub": "user1"}):
+        with patch("src.api.v1.websocket.asyncio.wait_for", new=mock_wait_for):
+            await websocket_endpoint(ws, "changes", "valid_token")
+
+    ws.send_text.assert_any_call('{"type":"ping"}')
+
+
+@pytest.mark.asyncio
+async def test_websocket_endpoint_disconnect_calls_manager_disconnect():
+    """WebSocketDisconnect 時に manager.disconnect が呼ばれる"""
+    ws = AsyncMock()
+
+    async def mock_wait_for(coro, timeout):
+        try:
+            coro.close()
+        except Exception:
+            pass
+        raise WebSocketDisconnect()
+
+    with patch("src.api.v1.websocket.decode_token", return_value={"sub": "user1"}):
+        with patch("src.api.v1.websocket.asyncio.wait_for", new=mock_wait_for):
+            with patch("src.api.v1.websocket.manager") as mock_manager:
+                mock_manager.connect = AsyncMock()
+                mock_manager.disconnect = MagicMock()
+                await websocket_endpoint(ws, "sla_alerts", "valid_token")
+                mock_manager.disconnect.assert_called_once_with(ws, "sla_alerts")
+
+
+@pytest.mark.asyncio
+async def test_websocket_endpoint_exception_handled_gracefully():
+    """接続中の予期しない例外が警告ログ後に正常終了する"""
+    ws = AsyncMock()
+
+    async def mock_wait_for(coro, timeout):
+        try:
+            coro.close()
+        except Exception:
+            pass
+        raise RuntimeError("unexpected network error")
+
+    with patch("src.api.v1.websocket.decode_token", return_value={"sub": "user1"}):
+        with patch("src.api.v1.websocket.asyncio.wait_for", new=mock_wait_for):
+            with patch("src.api.v1.websocket.manager") as mock_manager:
+                mock_manager.connect = AsyncMock()
+                mock_manager.disconnect = MagicMock()
+                # 例外が外部に伝播しないこと
+                await websocket_endpoint(ws, "all", "valid_token")
+                mock_manager.disconnect.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_websocket_endpoint_all_valid_channels():
+    """VALID_CHANNELS のすべてのチャンネルで接続できる"""
+    from src.services.notification_manager import VALID_CHANNELS
+
+    for channel in VALID_CHANNELS:
+        ws = AsyncMock()
+
+        async def mock_wait_for(coro, timeout):
+            try:
+                coro.close()
+            except Exception:
+                pass
+            raise WebSocketDisconnect()
+
+        with patch("src.api.v1.websocket.decode_token", return_value={"sub": "user1"}):
+            with patch("src.api.v1.websocket.asyncio.wait_for", new=mock_wait_for):
+                await websocket_endpoint(ws, channel, "valid_token")
+
+        ws.accept.assert_called_once()
+        # close は呼ばれないこと（正常接続のため）
+        ws.close.assert_not_called()
