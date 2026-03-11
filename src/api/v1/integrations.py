@@ -1,4 +1,4 @@
-"""外部統合設定API - Jira/ServiceNow統合フレームワーク"""
+"""外部統合設定API - Jira/ServiceNow統合フレームワーク + Slack/Teams Webhook管理"""
 
 import uuid
 from datetime import UTC, datetime
@@ -13,7 +13,16 @@ from src.core.database import get_db
 from src.middleware.rbac import get_current_user, require_role
 from src.models.incident import Incident, IncidentPriority, IncidentStatus
 from src.models.integration import IntegrationConfig
+from src.models.webhook import WebhookConfig
 from src.models.user import User, UserRole
+from src.schemas.webhook import (
+    WebhookConfigCreate,
+    WebhookConfigUpdate,
+    WebhookConfigResponse,
+    WebhookTestRequest,
+    WebhookTestResponse,
+)
+from src.services import slack_teams_webhook_service
 from src.services.notification_service import notification_service
 
 router = APIRouter(prefix="/integrations", tags=["integrations"])
@@ -269,3 +278,144 @@ async def webhook_servicenow(
         return {"received": True, "incident_id": str(incident.incident_id)}
 
     return {"received": True, "skipped": True}
+
+
+# ============================================================
+# Slack/Teams 送信Webhook設定 CRUD
+# ============================================================
+
+
+@router.get(
+    "/webhooks",
+    response_model=list[WebhookConfigResponse],
+    summary="Webhook設定一覧取得",
+    tags=["webhooks-outgoing"],
+)
+async def list_webhook_configs(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+) -> list[WebhookConfig]:
+    """アクティブ/非アクティブを含む全Webhook設定の一覧を返す"""
+    result = await db.execute(select(WebhookConfig))
+    return list(result.scalars().all())
+
+
+@router.post(
+    "/webhooks",
+    response_model=WebhookConfigResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Webhook設定作成",
+    tags=["webhooks-outgoing"],
+)
+async def create_webhook_config(
+    payload: WebhookConfigCreate,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[
+        User,
+        Depends(require_role(UserRole.SYSTEM_ADMIN, UserRole.SERVICE_MANAGER)),
+    ],
+) -> WebhookConfig:
+    """Slack/Teams 送信Webhookの設定を新規作成する"""
+    config = WebhookConfig(**payload.model_dump())
+    db.add(config)
+    await db.commit()
+    await db.refresh(config)
+    return config
+
+
+@router.get(
+    "/webhooks/{webhook_id}",
+    response_model=WebhookConfigResponse,
+    summary="Webhook設定詳細取得",
+    tags=["webhooks-outgoing"],
+)
+async def get_webhook_config(
+    webhook_id: int,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+) -> WebhookConfig:
+    """指定IDのWebhook設定を返す"""
+    config = await db.get(WebhookConfig, webhook_id)
+    if not config:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Webhook設定が見つかりません")
+    return config
+
+
+@router.put(
+    "/webhooks/{webhook_id}",
+    response_model=WebhookConfigResponse,
+    summary="Webhook設定更新",
+    tags=["webhooks-outgoing"],
+)
+async def update_webhook_config(
+    webhook_id: int,
+    payload: WebhookConfigUpdate,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[
+        User,
+        Depends(require_role(UserRole.SYSTEM_ADMIN, UserRole.SERVICE_MANAGER)),
+    ],
+) -> WebhookConfig:
+    """指定IDのWebhook設定を更新する"""
+    config = await db.get(WebhookConfig, webhook_id)
+    if not config:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Webhook設定が見つかりません")
+    for key, val in payload.model_dump(exclude_none=True).items():
+        setattr(config, key, val)
+    await db.commit()
+    await db.refresh(config)
+    return config
+
+
+@router.delete(
+    "/webhooks/{webhook_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Webhook設定削除",
+    tags=["webhooks-outgoing"],
+)
+async def delete_webhook_config(
+    webhook_id: int,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[
+        User,
+        Depends(require_role(UserRole.SYSTEM_ADMIN, UserRole.SERVICE_MANAGER)),
+    ],
+) -> None:
+    """指定IDのWebhook設定を削除する"""
+    config = await db.get(WebhookConfig, webhook_id)
+    if not config:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Webhook設定が見つかりません")
+    await db.delete(config)
+    await db.commit()
+
+
+@router.post(
+    "/webhooks/{webhook_id}/test",
+    response_model=WebhookTestResponse,
+    summary="Webhookテスト送信",
+    tags=["webhooks-outgoing"],
+)
+async def test_webhook_config(
+    webhook_id: int,
+    body: WebhookTestRequest,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[
+        User,
+        Depends(require_role(UserRole.SYSTEM_ADMIN, UserRole.SERVICE_MANAGER)),
+    ],
+) -> WebhookTestResponse:
+    """指定Webhook設定にテスト通知を送信する"""
+    config = await db.get(WebhookConfig, webhook_id)
+    if not config:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Webhook設定が見つかりません")
+
+    data = {"title": body.title, "description": body.message, "priority": "N/A"}
+    success = await slack_teams_webhook_service.send_webhook_with_retry(
+        config, "test_notification", data, max_retries=1
+    )
+    return WebhookTestResponse(
+        success=success,
+        webhook_id=webhook_id,
+        webhook_type=config.webhook_type,
+        message=f"テスト通知を{'送信しました' if success else '送信できませんでした'}",
+    )
