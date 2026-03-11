@@ -23,6 +23,7 @@ from src.api.v1.maintenance import router as maintenance_router
 from src.api.v1.notifications import router as notifications_router
 from src.api.v1.predictions import router as predictions_router
 from src.api.v1.problems import router as problems_router
+from src.api.v1.events import router as events_router
 from src.api.v1.push_subscriptions import router as push_subscriptions_router
 from src.api.v1.remediation import router as remediation_router
 from src.api.v1.reports import router as reports_router
@@ -68,3 +69,4 @@ api_router.include_router(dashboards_router)
 api_router.include_router(remediation_router)
 api_router.include_router(tenants_router)
 api_router.include_router(push_subscriptions_router)
+api_router.include_router(events_router)
