@@ -85,4 +85,3 @@ next-env.d.ts
 
 # Claude Code
 .claude/
-coverage.xml
