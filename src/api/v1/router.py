@@ -4,6 +4,7 @@ from fastapi import APIRouter
 
 from src.api.v1.ai import router as ai_router
 from src.api.v1.ai_analytics import router as ai_analytics_router
+from src.api.v1.analytics import router as analytics_router
 from src.api.v1.audit import router as audit_router
 from src.api.v1.auth import router as auth_router
 from src.api.v1.backup import router as backup_router
@@ -48,3 +49,4 @@ api_router.include_router(reports_router)
 api_router.include_router(search_router)
 api_router.include_router(integrations_router)
 api_router.include_router(maintenance_router)
+api_router.include_router(analytics_router)

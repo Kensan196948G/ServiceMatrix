@@ -30,7 +30,7 @@ from src.schemas.incident import (
     IncidentStatusTransition,
     IncidentUpdate,
 )
-from src.services import incident_service
+from src.services import incident_service, slack_teams_webhook_service
 from src.services.ai_triage_service import ai_triage_service
 
 router = APIRouter(prefix="/incidents", tags=["incidents"])
@@ -111,6 +111,9 @@ async def create_incident(
     background_tasks.add_task(
         ai_triage_service.apply_triage_to_incident, db, str(incident.incident_id)
     )
+    background_tasks.add_task(
+        slack_teams_webhook_service.dispatch_incident_event, db, "incident_created", incident
+    )
     await cache_delete_pattern("incidents:list:*")
     return incident
 
@@ -145,6 +148,7 @@ async def get_incident(
 async def update_incident(
     incident_id: uuid.UUID,
     data: IncidentUpdate,
+    background_tasks: BackgroundTasks,
     db: Annotated[AsyncSession, Depends(get_db)],
     current_user: Annotated[
         User,
@@ -170,6 +174,9 @@ async def update_incident(
         setattr(incident, field, value)
     await db.flush()
     await db.refresh(incident)
+    background_tasks.add_task(
+        slack_teams_webhook_service.dispatch_incident_event, db, "incident_updated", incident
+    )
     await cache_delete_pattern("incidents:list:*")
     return incident
 
