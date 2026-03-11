@@ -6,6 +6,10 @@ from typing import Any
 import redis.asyncio as aioredis  # type: ignore[import-untyped]
 import structlog
 
+from src.core.config import settings
+
+logger = structlog.get_logger(__name__)
+
 
 class TTLCache:
     """スレッドセーフなTTLキャッシュ（インメモリ）"""
@@ -35,10 +39,6 @@ class TTLCache:
 # アプリケーション全体で共有するキャッシュインスタンス
 incident_cache = TTLCache(ttl=60)
 change_cache = TTLCache(ttl=60)
-
-from src.core.config import settings
-
-logger = structlog.get_logger(__name__)
 
 _redis_client: aioredis.Redis | None = None
 

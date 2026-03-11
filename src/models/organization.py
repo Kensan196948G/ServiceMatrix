@@ -1,9 +1,11 @@
 """Organization (テナント) モデル"""
 import uuid
 from datetime import datetime
+
 from sqlalchemy import Boolean, DateTime, String, func
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
+
 from src.models.base import Base
 
 

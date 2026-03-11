@@ -90,7 +90,7 @@ class AIService:
                 import json  # noqa: PLC0415
 
                 return json.loads(content)
-            except Exception:
+            except Exception:  # noqa: S110
                 pass
         return self._mock_rca()
 
