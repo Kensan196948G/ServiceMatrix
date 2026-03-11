@@ -1,0 +1,33 @@
+# P1インシデント - サービス自動再起動プレイブック
+name: p1_auto_restart
+description: P1インシデント検知時にサービスを自動再起動する
+version: "1.0"
+
+trigger:
+  priority: P1
+  min_anomaly_score: 0.7
+
+steps:
+  - id: check_service
+    action: check_service_health
+    params:
+      timeout_seconds: 30
+
+  - id: restart_service
+    action: restart_service
+    params:
+      grace_period_seconds: 10
+      wait_for_healthy: true
+      timeout_seconds: 120
+
+  - id: verify_recovery
+    action: check_service_health
+    params:
+      timeout_seconds: 60
+      retry_count: 3
+
+notifications:
+  - type: slack
+    on: [start, success, failure]
+  - type: email
+    on: [failure]

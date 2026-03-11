@@ -1,0 +1,29 @@
+# 高負荷 - スケールアップ プレイブック
+name: high_load_scaleup
+description: 高負荷検知時にスケールアップを自動実行する
+version: "1.0"
+
+trigger:
+  match_keyword: "高負荷"
+  min_anomaly_score: 0.5
+
+steps:
+  - id: collect_metrics
+    action: collect_metrics
+    params:
+      metrics: [cpu_usage, memory_usage, request_count]
+
+  - id: scale_up
+    action: scale_up
+    params:
+      increment: 2
+      max_instances: 10
+
+  - id: monitor_effect
+    action: monitor_metrics
+    params:
+      duration_seconds: 300
+
+notifications:
+  - type: slack
+    on: [start, success, failure]
