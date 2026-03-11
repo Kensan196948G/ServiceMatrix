@@ -16,6 +16,7 @@ from src.middleware.audit import AuditMiddleware
 from src.middleware.metrics import MetricsMiddleware
 from src.middleware.rate_limit import RateLimitMiddleware
 from src.middleware.security_headers import SecurityHeadersMiddleware
+from src.middleware.tenant import TenantMiddleware
 from src.middleware.tracing import TracingMiddleware
 from src.services.sla_monitor_service import sla_monitor
 
@@ -136,6 +137,13 @@ Bearer Token (JWT) 認証を使用します。
                     "現在のトレース状態確認・trace_id/span_idの取得。"
                 ),
             },
+            {
+                "name": "tenants",
+                "description": (
+                    "マルチテナント管理。テナントCRUD・プラン管理・"
+                    "X-Tenant-IDヘッダーによるデータ分離。"
+                ),
+            },
         ],
     )
 
@@ -147,6 +155,7 @@ Bearer Token (JWT) 認証を使用します。
         allow_headers=["*"],
     )
     app.add_middleware(TracingMiddleware)
+    app.add_middleware(TenantMiddleware)
     app.add_middleware(AuditMiddleware)
     app.add_middleware(MetricsMiddleware)
     if settings.security_headers_enabled:
