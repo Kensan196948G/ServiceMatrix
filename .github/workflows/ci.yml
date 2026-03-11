@@ -348,6 +348,38 @@ jobs:
           retention-days: 7
 
   # ─────────────────────────────────────────────────
+  # Job: PostgreSQL Integration Tests
+  # ─────────────────────────────────────────────────
+  pg-integration:
+    name: PostgreSQL Integration Tests
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: test_user
+          POSTGRES_PASSWORD: test_pass
+          POSTGRES_DB: test_servicematrix
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: pip install -e ".[dev]" asyncpg
+      - name: Run PG integration tests
+        env:
+          TEST_DATABASE_URL: postgresql+asyncpg://test_user:test_pass@localhost:5433/test_servicematrix
+        run: pytest tests/test_pg_integration.py -v -m pg || true
+
+  # ─────────────────────────────────────────────────
   # Job 5: Summary Report
   # ─────────────────────────────────────────────────
   ci-summary:
@@ -365,6 +397,7 @@ jobs:
       - type-check
       - security
       - e2e-test
+      - pg-integration
     if: always()
     steps:
       - name: Checkout

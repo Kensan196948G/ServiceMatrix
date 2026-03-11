@@ -94,6 +94,9 @@ filterwarnings = [
     "ignore::DeprecationWarning:passlib.*",
     "ignore::DeprecationWarning:fastapi.*",
 ]
+markers = [
+    "pg: PostgreSQL integration tests (require running postgres)",
+]
 
 [tool.coverage.run]
 source = ["src"]
