@@ -41,10 +41,12 @@ incident_cache = TTLCache(ttl=60)
 change_cache = TTLCache(ttl=60)
 
 _redis_client: aioredis.Redis | None = None
+_redis_sentinel: Any | None = None
+_redis_cluster_client: Any | None = None
 
 
 def get_redis() -> aioredis.Redis:
-    """Redisクライアントを取得（シングルトン）"""
+    """Redisクライアントを取得（シングルトン・後方互換）"""
     global _redis_client
     if _redis_client is None:
         _redis_client = aioredis.from_url(
@@ -53,6 +55,78 @@ def get_redis() -> aioredis.Redis:
             decode_responses=True,
         )
     return _redis_client
+
+
+async def get_redis_client() -> aioredis.Redis | Any:
+    """Redis接続クライアントを返す（Sentinel / Cluster / Single を自動選択）"""
+    global _redis_client, _redis_sentinel, _redis_cluster_client
+
+    if settings.redis_sentinel_enabled:
+        # Sentinel モード
+        if _redis_sentinel is None:
+            sentinel_hosts = []
+            for host_port in settings.redis_sentinel_hosts.split(","):
+                host_port = host_port.strip()
+                if not host_port:
+                    continue
+                if ":" in host_port:
+                    host, port_str = host_port.rsplit(":", 1)
+                    sentinel_hosts.append((host, int(port_str)))
+                else:
+                    sentinel_hosts.append((host_port, 26379))
+            if not sentinel_hosts:
+                sentinel_hosts = [("localhost", 26379)]
+            _redis_sentinel = aioredis.Sentinel(
+                sentinel_hosts,
+                socket_timeout=0.5,
+                decode_responses=True,
+            )
+        return _redis_sentinel.master_for(
+            settings.redis_sentinel_master,
+            socket_timeout=0.5,
+        )
+
+    if settings.redis_cluster_enabled:
+        # Cluster モード
+        if _redis_cluster_client is None:
+            from redis.asyncio.cluster import RedisCluster  # type: ignore[import-untyped]
+
+            _redis_cluster_client = RedisCluster.from_url(
+                settings.redis_url,
+                decode_responses=True,
+            )
+        return _redis_cluster_client
+
+    # Single モード（既存）
+    return get_redis()
+
+
+async def health_check_redis() -> dict:
+    """Redis ヘルスチェック情報を返す"""
+    if settings.redis_sentinel_enabled:
+        mode = "sentinel"
+    elif settings.redis_cluster_enabled:
+        mode = "cluster"
+    else:
+        mode = "single"
+
+    try:
+        client = await get_redis_client()
+        start = time.monotonic()
+        await client.ping()
+        latency_ms = (time.monotonic() - start) * 1000
+        return {
+            "status": "ok",
+            "mode": mode,
+            "latency_ms": round(latency_ms, 3),
+        }
+    except Exception as e:
+        logger.warning("redis_health_check_failed", error=str(e))
+        return {
+            "status": "unavailable",
+            "mode": mode,
+            "latency_ms": None,
+        }
 
 
 async def cache_get(key: str) -> str | None:
