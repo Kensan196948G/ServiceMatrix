@@ -19,6 +19,7 @@ from src.middleware.rate_limit import RateLimitMiddleware
 from src.middleware.security_headers import SecurityHeadersMiddleware
 from src.middleware.tenant import TenantMiddleware
 from src.middleware.tracing import TracingMiddleware
+from src.services.event_consumer import event_consumer
 from src.services.sla_monitor_service import sla_monitor
 
 
@@ -27,7 +28,9 @@ async def lifespan(app: FastAPI):
     setup_logging()
     setup_telemetry()
     await sla_monitor.start()
+    await event_consumer.start()
     yield
+    await event_consumer.stop()
     await sla_monitor.stop()
 
 
