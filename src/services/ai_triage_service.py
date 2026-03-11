@@ -153,7 +153,10 @@ class OllamaTriageProvider(TriageProvider):
                 messages=[
                     {
                         "role": "system",
-                        "content": "You are an IT incident triage assistant. Always respond with valid JSON.",
+                        "content": (
+                            "You are an IT incident triage assistant. "
+                            "Always respond with valid JSON."
+                        ),
                     },
                     {"role": "user", "content": prompt},
                 ],
