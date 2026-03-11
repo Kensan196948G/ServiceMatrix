@@ -1,8 +1,8 @@
-"""グローバル検索API - インシデント/問題/変更/CMDBをLIKE検索"""
+"""グローバル検索API - インシデント/問題/変更/CMDBをLIKE検索 + セマンティック検索"""
 
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Body, Depends, Query
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -13,6 +13,7 @@ from src.models.cmdb import ConfigurationItem
 from src.models.incident import Incident
 from src.models.problem import Problem
 from src.models.user import User
+from src.services.semantic_search_service import semantic_search_service
 
 router = APIRouter(prefix="/search", tags=["search"])
 
@@ -119,3 +120,71 @@ async def global_search(
 
     total = sum(len(v) for v in results.values())
     return {"query": q, "total": total, "results": results}
+
+
+@router.post("/semantic", summary="セマンティック検索（自然言語インシデント検索）")
+async def semantic_search(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+    query: str = Body(..., embed=True, description="自然言語クエリ（例: ネットワーク障害）"),
+    limit: int = Body(default=10, embed=True, ge=1, le=50),
+) -> dict[str, Any]:
+    """
+    自然言語でインシデントをセマンティック検索する。
+    本番環境（PostgreSQL + pgvector）ではベクトル検索を使用。
+    テスト/開発環境ではキーワードフォールバックを使用。
+    """
+    # DBからインシデント一覧を取得（最大500件）
+    stmt = select(Incident).limit(500)
+    rows = (await db.execute(stmt)).scalars().all()
+
+    incidents = [
+        {
+            "id": str(r.incident_id),
+            "incident_number": r.incident_number,
+            "title": r.title,
+            "description": r.description or "",
+            "status": r.status,
+            "priority": r.priority,
+        }
+        for r in rows
+    ]
+
+    # セマンティック検索 or キーワードフォールバック
+    mode = "vector" if semantic_search_service._use_vector_search else "keyword"
+    matched = semantic_search_service.search_incidents_by_keywords(query, incidents)
+    matched = matched[:limit]
+
+    return {
+        "query": query,
+        "mode": mode,
+        "count": len(matched),
+        "results": matched,
+    }
+
+
+@router.get("/suggest", summary="検索サジェスト（キーワードマッチ）")
+async def search_suggest(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+    q: str = Query(..., min_length=1, description="サジェスト用キーワード"),
+    limit: int = Query(default=5, ge=1, le=20),
+) -> dict[str, Any]:
+    """
+    入力途中のキーワードに対して検索サジェストを返す。
+    インシデントタイトルの前方一致でシンプルなサジェスト。
+    """
+    pattern = f"%{q}%"
+    stmt = (
+        select(Incident.title, Incident.incident_number)
+        .where(Incident.title.ilike(pattern))
+        .limit(limit)
+    )
+    rows = (await db.execute(stmt)).all()
+
+    suggestions = [
+        {"title": row.title, "incident_number": row.incident_number}
+        for row in rows
+    ]
+
+    return {"query": q, "suggestions": suggestions}
