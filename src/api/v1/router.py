@@ -16,6 +16,7 @@ from src.api.v1.integrations import router as integrations_router
 from src.api.v1.integrations_sync import router as integrations_sync_router
 from src.api.v1.maintenance import router as maintenance_router
 from src.api.v1.notifications import router as notifications_router
+from src.api.v1.predictions import router as predictions_router
 from src.api.v1.problems import router as problems_router
 from src.api.v1.reports import router as reports_router
 from src.api.v1.search import router as search_router
@@ -48,3 +49,4 @@ api_router.include_router(search_router)
 api_router.include_router(integrations_router)
 api_router.include_router(integrations_sync_router)
 api_router.include_router(maintenance_router)
+api_router.include_router(predictions_router)
