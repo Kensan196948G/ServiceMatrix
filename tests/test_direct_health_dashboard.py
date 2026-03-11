@@ -66,8 +66,10 @@ async def test_detailed_health_db_ok():
 
     db = AsyncMock()
     db.execute = AsyncMock(return_value=MagicMock())
+    db_read = AsyncMock()
+    db_read.execute = AsyncMock(return_value=MagicMock())
 
-    result = await detailed_health(db=db)
+    result = await detailed_health(db=db, db_read=db_read)
 
     assert result["status"] == "healthy"
     assert result["services"]["database"] == "connected"
@@ -79,8 +81,10 @@ async def test_detailed_health_db_error():
 
     db = AsyncMock()
     db.execute = AsyncMock(side_effect=Exception("タイムアウト"))
+    db_read = AsyncMock()
+    db_read.execute = AsyncMock(return_value=MagicMock())
 
-    result = await detailed_health(db=db)
+    result = await detailed_health(db=db, db_read=db_read)
 
     assert result["status"] == "degraded"
     assert result["services"]["database"] == "error"
