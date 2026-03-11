@@ -102,9 +102,7 @@ async def trigger_sync(
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> dict[str, Any]:
     """手動同期トリガー"""
-    row = await db.execute(
-        select(Incident).where(Incident.incident_id == request.incident_id)
-    )
+    row = await db.execute(select(Incident).where(Incident.incident_id == request.incident_id))
     incident = row.scalar_one_or_none()
     if incident is None:
         raise HTTPException(

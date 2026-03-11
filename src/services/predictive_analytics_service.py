@@ -1,4 +1,5 @@
 """予測的インシデント分析サービス"""
+
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -85,9 +86,7 @@ class PredictiveAnalyticsService:
         from prophet import Prophet  # noqa: PLC0415
 
         df = pd.DataFrame([{"ds": d["date"], "y": d["count"]} for d in data])
-        model = Prophet(
-            yearly_seasonality=False, weekly_seasonality=True, daily_seasonality=False
-        )
+        model = Prophet(yearly_seasonality=False, weekly_seasonality=True, daily_seasonality=False)
         model.fit(df)
         future = model.make_future_dataframe(periods=forecast_days)
         forecast = model.predict(future)

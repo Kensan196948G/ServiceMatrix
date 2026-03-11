@@ -21,10 +21,14 @@ async def get_predictions(
     db: Annotated[AsyncSession, Depends(get_db)],
     current_user: Annotated[
         User,
-        Depends(require_role(
-            UserRole.INCIDENT_MANAGER, UserRole.SERVICE_MANAGER,
-            UserRole.SYSTEM_ADMIN, UserRole.CHANGE_MANAGER,
-        )),
+        Depends(
+            require_role(
+                UserRole.INCIDENT_MANAGER,
+                UserRole.SERVICE_MANAGER,
+                UserRole.SYSTEM_ADMIN,
+                UserRole.CHANGE_MANAGER,
+            )
+        ),
     ],
     days: int = Query(default=7, ge=1, le=30, description="予測日数"),
 ) -> dict:
@@ -47,9 +51,10 @@ async def get_predictions(
     # インシデントが存在しない日も count=0 で補完する（疎なデータでの過大予測を防ぐ）
     counts_by_date = {row.date: row.count for row in rows}
     historical_data = [
-        {"date": str(since.date() + timedelta(days=i)), "count": counts_by_date.get(
-            (since.date() + timedelta(days=i)), 0
-        )}
+        {
+            "date": str(since.date() + timedelta(days=i)),
+            "count": counts_by_date.get((since.date() + timedelta(days=i)), 0),
+        }
         for i in range(30)
     ]
 
@@ -69,10 +74,14 @@ async def get_predictions_summary(
     db: Annotated[AsyncSession, Depends(get_db)],
     current_user: Annotated[
         User,
-        Depends(require_role(
-            UserRole.INCIDENT_MANAGER, UserRole.SERVICE_MANAGER,
-            UserRole.SYSTEM_ADMIN, UserRole.CHANGE_MANAGER,
-        )),
+        Depends(
+            require_role(
+                UserRole.INCIDENT_MANAGER,
+                UserRole.SERVICE_MANAGER,
+                UserRole.SYSTEM_ADMIN,
+                UserRole.CHANGE_MANAGER,
+            )
+        ),
     ],
 ) -> dict:
     """今後7日間の予測サマリー（合計件数・トレンド・信頼度）を返す"""
@@ -92,9 +101,10 @@ async def get_predictions_summary(
 
     counts_by_date = {row.date: row.count for row in rows}
     historical_data = [
-        {"date": str(since.date() + timedelta(days=i)), "count": counts_by_date.get(
-            (since.date() + timedelta(days=i)), 0
-        )}
+        {
+            "date": str(since.date() + timedelta(days=i)),
+            "count": counts_by_date.get((since.date() + timedelta(days=i)), 0),
+        }
         for i in range(30)
     ]
 
