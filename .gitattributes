@@ -1,0 +1,31 @@
+# Git line ending normalization
+# Ensure consistent line endings across platforms
+
+# Default: text files get LF on checkout
+* text=auto eol=lf
+
+# Shell scripts must always be LF
+*.sh text eol=lf
+Makefile text eol=lf
+
+# Python files
+*.py text eol=lf
+
+# YAML/JSON/TOML
+*.yml text eol=lf
+*.yaml text eol=lf
+*.json text eol=lf
+*.toml text eol=lf
+
+# Markdown
+*.md text eol=lf
+
+# Binary files (no conversion)
+*.png binary
+*.jpg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.zip binary
+*.tar binary
+*.gz binary
