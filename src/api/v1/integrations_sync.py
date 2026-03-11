@@ -1,5 +1,6 @@
 """外部ITSM双方向同期API - Jira/ServiceNow同期基盤"""
 
+import uuid
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -102,7 +103,23 @@ async def trigger_sync(
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> dict[str, Any]:
     """手動同期トリガー"""
-    row = await db.execute(select(Incident).where(Incident.incident_id == request.incident_id))
+    # integration_type を先に検証し、DB アクセス前に不正入力を弾く
+    if request.integration_type not in ("jira", "servicenow"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Unknown integration_type: {request.integration_type}",
+        )
+
+    # str → UUID 変換（UUID カラムとの型不一致による StatementError を防ぐ）
+    try:
+        incident_uuid = uuid.UUID(request.incident_id)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Invalid UUID format: {request.incident_id}",
+        ) from exc
+
+    row = await db.execute(select(Incident).where(Incident.incident_id == incident_uuid))
     incident = row.scalar_one_or_none()
     if incident is None:
         raise HTTPException(
@@ -124,15 +141,10 @@ async def trigger_sync(
             incident_data=incident_data,
             config=config,
         )
-    elif request.integration_type == "servicenow":
+    else:
         result = await integration_sync_service.sync_incident_to_servicenow(
             incident_data=incident_data,
             config=config,
-        )
-    else:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Unknown integration_type: {request.integration_type}",
         )
 
     return {
