@@ -1,10 +1,24 @@
 """統合同期サービステスト - Jira/ServiceNow双方向同期基盤 (Issue #56)"""
 
+from unittest.mock import patch
+
 import pytest
 import pytest_asyncio
-from unittest.mock import AsyncMock, patch
 
 from src.services.integration_sync_service import IntegrationSyncService
+
+
+@pytest_asyncio.fixture(autouse=True)
+async def mock_incident_seq():
+    """func.nextval('incident_seq') の代替（SQLite非対応のためモック）"""
+    _counter = [0]
+
+    async def _get_next(db):
+        _counter[0] += 1
+        return f"INC-2024-{_counter[0]:06d}"
+
+    with patch("src.services.incident_service._get_next_incident_number", _get_next):
+        yield
 
 
 # ---------------------------------------------------------------------------
@@ -189,10 +203,19 @@ async def test_sync_status_endpoint(client, auth_headers) -> None:
 
 @pytest.mark.asyncio
 async def test_sync_trigger_endpoint_jira(client, auth_headers) -> None:
-    """手動同期トリガー - Jira"""
+    """手動同期トリガー - Jira（インシデント事前作成）"""
+    # 事前にインシデントを作成して実際のIDを取得
+    create_resp = await client.post(
+        "/api/v1/incidents",
+        json={"title": "Jira同期テスト", "priority": "P2"},
+        headers=auth_headers,
+    )
+    assert create_resp.status_code == 201
+    incident_id = create_resp.json()["incident_id"]
+
     payload = {
         "config_id": "00000000-0000-0000-0000-000000000001",
-        "incident_id": "abcd1234-0000-0000-0000-000000000000",
+        "incident_id": incident_id,
         "integration_type": "jira",
     }
     resp = await client.post(
@@ -208,10 +231,19 @@ async def test_sync_trigger_endpoint_jira(client, auth_headers) -> None:
 
 @pytest.mark.asyncio
 async def test_sync_trigger_endpoint_servicenow(client, auth_headers) -> None:
-    """手動同期トリガー - ServiceNow"""
+    """手動同期トリガー - ServiceNow（インシデント事前作成）"""
+    # 事前にインシデントを作成して実際のIDを取得
+    create_resp = await client.post(
+        "/api/v1/incidents",
+        json={"title": "ServiceNow同期テスト", "priority": "P3"},
+        headers=auth_headers,
+    )
+    assert create_resp.status_code == 201
+    incident_id = create_resp.json()["incident_id"]
+
     payload = {
         "config_id": "00000000-0000-0000-0000-000000000002",
-        "incident_id": "efgh5678-0000-0000-0000-000000000000",
+        "incident_id": incident_id,
         "integration_type": "servicenow",
     }
     resp = await client.post(

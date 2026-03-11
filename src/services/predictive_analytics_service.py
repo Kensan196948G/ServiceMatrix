@@ -30,7 +30,7 @@ class PredictiveAnalyticsService:
             {"predictions": [{"date": "...", "predicted_count": N, "lower": N, "upper": N}],
             "model": "prophet"|"linear"}
         """
-        if len(historical_data) < 3:
+        if len(historical_data) < 3 or all(d["count"] == 0 for d in historical_data):
             return self._empty_forecast(forecast_days)
 
         try:
