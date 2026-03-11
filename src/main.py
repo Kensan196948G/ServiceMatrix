@@ -170,6 +170,16 @@ Bearer Token (JWT) 認証を使用します。
     app.include_router(api_router, prefix="/api/v1")
     app.include_router(graphql_router, prefix="/graphql", tags=["graphql"])
 
+    @app.get("/metrics", include_in_schema=False)
+    async def prometheus_metrics():
+        from fastapi.responses import PlainTextResponse
+
+        from src.core.metrics import metrics
+
+        return PlainTextResponse(
+            metrics.to_prometheus_text(), media_type="text/plain; version=0.0.4"
+        )
+
     return app
 
 
