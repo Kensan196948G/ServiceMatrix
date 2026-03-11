@@ -13,12 +13,12 @@ from src.core.database import get_db
 from src.middleware.rbac import get_current_user, require_role
 from src.models.incident import Incident, IncidentPriority, IncidentStatus
 from src.models.integration import IntegrationConfig
-from src.models.webhook import WebhookConfig
 from src.models.user import User, UserRole
+from src.models.webhook import WebhookConfig
 from src.schemas.webhook import (
     WebhookConfigCreate,
-    WebhookConfigUpdate,
     WebhookConfigResponse,
+    WebhookConfigUpdate,
     WebhookTestRequest,
     WebhookTestResponse,
 )
@@ -337,7 +337,9 @@ async def get_webhook_config(
     """指定IDのWebhook設定を返す"""
     config = await db.get(WebhookConfig, webhook_id)
     if not config:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Webhook設定が見つかりません")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Webhook設定が見つかりません"
+        )
     return config
 
 
@@ -359,7 +361,9 @@ async def update_webhook_config(
     """指定IDのWebhook設定を更新する"""
     config = await db.get(WebhookConfig, webhook_id)
     if not config:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Webhook設定が見つかりません")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Webhook設定が見つかりません"
+        )
     for key, val in payload.model_dump(exclude_none=True).items():
         setattr(config, key, val)
     await db.commit()
@@ -384,7 +388,9 @@ async def delete_webhook_config(
     """指定IDのWebhook設定を削除する"""
     config = await db.get(WebhookConfig, webhook_id)
     if not config:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Webhook設定が見つかりません")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Webhook設定が見つかりません"
+        )
     await db.delete(config)
     await db.commit()
 
@@ -407,7 +413,9 @@ async def test_webhook_config(
     """指定Webhook設定にテスト通知を送信する"""
     config = await db.get(WebhookConfig, webhook_id)
     if not config:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Webhook設定が見つかりません")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Webhook設定が見つかりません"
+        )
 
     data = {"title": body.title, "description": body.message, "priority": "N/A"}
     success = await slack_teams_webhook_service.send_webhook_with_retry(
