@@ -26,6 +26,12 @@ class Settings(BaseSettings):
     # Redis
     redis_url: str = "redis://localhost:6379/0"
 
+    # Redis HA設定
+    redis_sentinel_hosts: str = ""  # "host1:26379,host2:26379,host3:26379"
+    redis_sentinel_master: str = "mymaster"
+    redis_sentinel_enabled: bool = False
+    redis_cluster_enabled: bool = False
+
     # JWT認証
     secret_key: str = "change-this-in-production"  # noqa: S105
     access_token_expire_minutes: int = 30

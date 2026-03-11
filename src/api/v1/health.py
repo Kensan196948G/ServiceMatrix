@@ -7,6 +7,7 @@ from fastapi.responses import PlainTextResponse
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.core.cache import health_check_redis
 from src.core.config import settings
 from src.core.database import get_db
 from src.core.metrics import metrics
@@ -23,9 +24,15 @@ async def health_check(db: Annotated[AsyncSession, Depends(get_db)]):
     except Exception:
         db_status = "error"
 
+    redis_info = await health_check_redis()
+
+    overall_status = "ok" if db_status == "ok" else "degraded"
+
     return {
-        "status": "ok" if db_status == "ok" else "degraded",
+        "status": overall_status,
+        "version": settings.app_version,
         "database": db_status,
+        "redis": redis_info,
     }
 
 
