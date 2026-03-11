@@ -53,6 +53,10 @@ class Settings(BaseSettings):
     alert_webhook_url: str = ""
     alert_webhook_enabled: bool = False
 
+    # Read Replica
+    read_replica_url: str = ""  # 設定されていない場合はプライマリを使用
+    read_replica_enabled: bool = False
+
     # SLAエンジン設定
     sla_check_interval_seconds: int = 60
     sla_warning_threshold_70: float = 0.70
