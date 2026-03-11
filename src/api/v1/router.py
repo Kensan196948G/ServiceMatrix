@@ -3,6 +3,8 @@
 from fastapi import APIRouter
 
 from src.api.v1.ai import router as ai_router
+from src.api.v1.ai_analytics import router as ai_analytics_router
+from src.api.v1.analytics import router as analytics_router
 from src.api.v1.audit import router as audit_router
 from src.api.v1.auth import router as auth_router
 from src.api.v1.backup import router as backup_router
@@ -41,6 +43,7 @@ api_router.include_router(sla_router)
 api_router.include_router(webhooks_router)
 api_router.include_router(audit_router)
 api_router.include_router(ai_router)
+api_router.include_router(ai_analytics_router)
 api_router.include_router(websocket_router)
 api_router.include_router(notifications_router)
 api_router.include_router(dashboard_router)
@@ -50,3 +53,4 @@ api_router.include_router(integrations_router)
 api_router.include_router(integrations_sync_router)
 api_router.include_router(maintenance_router)
 api_router.include_router(predictions_router)
+api_router.include_router(analytics_router)
