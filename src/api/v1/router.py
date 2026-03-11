@@ -9,12 +9,15 @@ from src.api.v1.audit import router as audit_router
 from src.api.v1.auth import router as auth_router
 from src.api.v1.auth_sso import router as auth_sso_router
 from src.api.v1.backup import router as backup_router
+from src.api.v1.cache import router as cache_router
 from src.api.v1.changes import router as changes_router
 from src.api.v1.cmdb import router as cmdb_router
 from src.api.v1.compliance import router as compliance_router
 from src.api.v1.compliance_reports import router as compliance_reports_router
 from src.api.v1.dashboard import router as dashboard_router
 from src.api.v1.dashboards import router as dashboards_router
+from src.api.v1.events import router as events_router
+from src.api.v1.feature_flags import router as feature_flags_router
 from src.api.v1.health import router as health_router
 from src.api.v1.incidents import router as incidents_router
 from src.api.v1.integrations import router as integrations_router
@@ -23,8 +26,6 @@ from src.api.v1.maintenance import router as maintenance_router
 from src.api.v1.notifications import router as notifications_router
 from src.api.v1.predictions import router as predictions_router
 from src.api.v1.problems import router as problems_router
-from src.api.v1.cache import router as cache_router
-from src.api.v1.events import router as events_router
 from src.api.v1.push_subscriptions import router as push_subscriptions_router
 from src.api.v1.remediation import router as remediation_router
 from src.api.v1.reports import router as reports_router
@@ -72,3 +73,4 @@ api_router.include_router(tenants_router)
 api_router.include_router(push_subscriptions_router)
 api_router.include_router(events_router)
 api_router.include_router(cache_router)
+api_router.include_router(feature_flags_router)
