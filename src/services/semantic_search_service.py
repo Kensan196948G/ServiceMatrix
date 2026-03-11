@@ -1,4 +1,5 @@
 """セマンティック検索サービス - ベクトル類似度検索"""
+
 # sentence-transformers は本番環境でのみ使用
 # インストール方法: pip install sentence-transformers
 # CIには含めない（重量ライブラリのため）
@@ -23,6 +24,7 @@ class SemanticSearchService:
         """SentenceTransformers エンコーダーの読み込みを試みる"""
         try:
             from sentence_transformers import SentenceTransformer  # noqa: PLC0415
+
             self._encoder = SentenceTransformer("paraphrase-multilingual-MiniLM-L12-v2")
             self._use_vector_search = True
             logger.info("semantic_encoder_loaded")
@@ -50,9 +52,7 @@ class SemanticSearchService:
         intersection = query_words & text_words
         return len(intersection) / len(query_words)
 
-    def search_incidents_by_keywords(
-        self, query: str, incidents: list[dict]
-    ) -> list[dict]:
+    def search_incidents_by_keywords(self, query: str, incidents: list[dict]) -> list[dict]:
         """キーワードベースでインシデントを検索（フォールバック）"""
         results = []
         for incident in incidents:

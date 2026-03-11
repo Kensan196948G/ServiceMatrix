@@ -182,9 +182,6 @@ async def search_suggest(
     )
     rows = (await db.execute(stmt)).all()
 
-    suggestions = [
-        {"title": row.title, "incident_number": row.incident_number}
-        for row in rows
-    ]
+    suggestions = [{"title": row.title, "incident_number": row.incident_number} for row in rows]
 
     return {"query": q, "suggestions": suggestions}
