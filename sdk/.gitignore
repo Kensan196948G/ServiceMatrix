@@ -1,3 +1,2 @@
-# 自動生成ファイル（CI で生成）
-typescript/schema.d.ts
+# openapi.json はローカル生成物（CI で取得するため除外）
 openapi.json

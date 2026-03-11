@@ -44,7 +44,14 @@ async def get_predictions(
     )
     rows = result.all()
 
-    historical_data = [{"date": str(row.date), "count": row.count} for row in rows]
+    # インシデントが存在しない日も count=0 で補完する（疎なデータでの過大予測を防ぐ）
+    counts_by_date = {row.date: row.count for row in rows}
+    historical_data = [
+        {"date": str(since.date() + timedelta(days=i)), "count": counts_by_date.get(
+            (since.date() + timedelta(days=i)), 0
+        )}
+        for i in range(30)
+    ]
 
     forecast = predictive_analytics_service.predict_weekly_incidents(
         historical_data, forecast_days=days
@@ -83,7 +90,13 @@ async def get_predictions_summary(
     )
     rows = result.all()
 
-    historical_data = [{"date": str(row.date), "count": row.count} for row in rows]
+    counts_by_date = {row.date: row.count for row in rows}
+    historical_data = [
+        {"date": str(since.date() + timedelta(days=i)), "count": counts_by_date.get(
+            (since.date() + timedelta(days=i)), 0
+        )}
+        for i in range(30)
+    ]
 
     forecast = predictive_analytics_service.predict_weekly_incidents(
         historical_data, forecast_days=7

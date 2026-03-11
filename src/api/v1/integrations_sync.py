@@ -4,8 +4,12 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.core.database import get_db
 from src.middleware.rbac import require_role
+from src.models.incident import Incident
 from src.models.user import User, UserRole
 from src.services.integration_sync_service import integration_sync_service
 
@@ -95,11 +99,25 @@ async def test_connection(
 async def trigger_sync(
     request: SyncTriggerRequest,
     current_user: Annotated[User, Depends(require_role(*_ALLOWED_ROLES))],
+    db: Annotated[AsyncSession, Depends(get_db)],
 ) -> dict[str, Any]:
     """手動同期トリガー"""
+    row = await db.execute(
+        select(Incident).where(Incident.incident_id == request.incident_id)
+    )
+    incident = row.scalar_one_or_none()
+    if incident is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Incident not found: {request.incident_id}",
+        )
+
     incident_data = {
-        "incident_id": request.incident_id,
-        "config_id": request.config_id,
+        "incident_id": str(incident.incident_id),
+        "title": incident.title,
+        "description": incident.description or "",
+        "priority": incident.priority,
+        "status": incident.status,
     }
     config = {"config_id": request.config_id}
 
