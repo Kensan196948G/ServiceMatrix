@@ -20,8 +20,13 @@ class TenantMiddleware(BaseHTTPMiddleware):
     EXCLUDED_PATHS = {"/api/v1/health", "/api/v1/auth/login", "/docs", "/redoc", "/openapi.json"}
 
     async def dispatch(self, request: Request, call_next) -> Response:
-        tenant_header = request.headers.get("X-Tenant-ID", "").strip()
         request.state.tenant_id = None
+
+        # 除外パスはテナントヘッダーを検証しない
+        if request.url.path in self.EXCLUDED_PATHS:
+            return await call_next(request)
+
+        tenant_header = request.headers.get("X-Tenant-ID", "").strip()
 
         if tenant_header:
             try:

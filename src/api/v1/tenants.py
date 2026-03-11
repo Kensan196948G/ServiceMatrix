@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.database import get_db
-from src.middleware.rbac import get_current_user, require_role
+from src.middleware.rbac import require_role
 from src.models.tenant import TenantPlan
 from src.models.user import User, UserRole
 from src.services.tenant_service import tenant_service
@@ -97,9 +97,9 @@ async def list_tenants(
 async def get_tenant(
     tenant_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_role(UserRole.SYSTEM_ADMIN)),
 ) -> TenantResponse:
-    """テナントを取得する。"""
+    """テナントを取得する（SystemAdmin 専用）。"""
     tenant = await tenant_service.get_tenant(db, tenant_id)
     if tenant is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tenant not found")

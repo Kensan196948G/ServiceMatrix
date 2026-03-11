@@ -156,18 +156,20 @@ def test_is_plan_allowed_enterprise() -> None:
 
 
 @pytest.mark.asyncio
-async def test_tenant_middleware_valid_header(client) -> None:
-    """有効な X-Tenant-ID ヘッダーはそのまま通す"""
+async def test_tenant_middleware_valid_header(client, auth_headers) -> None:
+    """有効な X-Tenant-ID ヘッダーは認証エンドポイントでそのまま通す"""
     tenant_id = str(uuid.uuid4())
-    resp = await client.get("/api/v1/health", headers={"X-Tenant-ID": tenant_id})
+    # 非除外パス（/api/v1/tenants）でヘッダーが反映されることを確認
+    resp = await client.get("/api/v1/tenants", headers={**auth_headers, "X-Tenant-ID": tenant_id})
     assert resp.status_code == 200
     assert resp.headers.get("x-tenant-id") == tenant_id
 
 
 @pytest.mark.asyncio
 async def test_tenant_middleware_invalid_header(client) -> None:
-    """不正な X-Tenant-ID は 400"""
-    resp = await client.get("/api/v1/health", headers={"X-Tenant-ID": "not-a-uuid"})
+    """不正な X-Tenant-ID は 400（除外パス以外）"""
+    # /api/v1/tenants は除外パスではないので検証が走る
+    resp = await client.get("/api/v1/tenants", headers={"X-Tenant-ID": "not-a-uuid"})
     assert resp.status_code == 400
     assert "X-Tenant-ID" in resp.json()["detail"]
 
@@ -178,6 +180,13 @@ async def test_tenant_middleware_no_header(client) -> None:
     resp = await client.get("/api/v1/health")
     assert resp.status_code == 200
     assert "x-tenant-id" not in resp.headers
+
+
+@pytest.mark.asyncio
+async def test_tenant_middleware_excluded_path_ignores_invalid_header(client) -> None:
+    """除外パス（/api/v1/health）は不正な X-Tenant-ID でも 400 にならない"""
+    resp = await client.get("/api/v1/health", headers={"X-Tenant-ID": "not-a-uuid"})
+    assert resp.status_code == 200
 
 
 # ---------------------------------------------------------------------------

@@ -1,15 +1,15 @@
 """add tenants table - Issue #75 マルチテナント基盤
 
-Revision ID: 006
-Revises: 005
+Revision ID: 018
+Revises: 017
 Create Date: 2026-03-11 00:00:00.000000
 """
 
 import sqlalchemy as sa
 from alembic import op
 
-revision = "006"
-down_revision = "005"
+revision = "018"
+down_revision = "017"
 branch_labels = None
 depends_on = None
 
