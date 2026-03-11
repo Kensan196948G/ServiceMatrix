@@ -70,3 +70,14 @@ ingress:
   host: servicematrix.example.com
   tls: true
   tlsSecretName: servicematrix-tls
+
+networkPolicy:
+  enabled: true
+
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+
+nameOverride: ""
+fullnameOverride: ""

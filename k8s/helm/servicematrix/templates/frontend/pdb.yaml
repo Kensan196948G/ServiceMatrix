@@ -1,0 +1,15 @@
+{{- if gt (int .Values.frontend.replicaCount) 1 }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "servicematrix.fullname" . }}-frontend
+  namespace: {{ include "servicematrix.namespace" . }}
+  labels:
+    {{- include "servicematrix.labels" . | nindent 4 }}
+    app.kubernetes.io/component: frontend
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      {{- include "servicematrix.selectorLabels" (dict "root" . "component" "frontend") | nindent 6 }}
+{{- end }}

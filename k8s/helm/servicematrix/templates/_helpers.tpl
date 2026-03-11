@@ -58,3 +58,14 @@ Image with optional registry prefix
 {{- $registry := .root.Values.global.imageRegistry | default "" -}}
 {{- printf "%s%s:%s" $registry .repository .tag -}}
 {{- end }}
+
+{{/*
+ServiceAccount name
+*/}}
+{{- define "servicematrix.serviceAccountName" -}}
+{{- if .Values.serviceAccount.create }}
+{{- default (include "servicematrix.fullname" .) .Values.serviceAccount.name }}
+{{- else }}
+{{- default "default" .Values.serviceAccount.name }}
+{{- end }}
+{{- end }}
