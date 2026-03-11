@@ -7,6 +7,7 @@ from src.api.v1.ai_analytics import router as ai_analytics_router
 from src.api.v1.analytics import router as analytics_router
 from src.api.v1.audit import router as audit_router
 from src.api.v1.auth import router as auth_router
+from src.api.v1.auth_sso import router as auth_sso_router
 from src.api.v1.backup import router as backup_router
 from src.api.v1.changes import router as changes_router
 from src.api.v1.cmdb import router as cmdb_router
@@ -35,6 +36,7 @@ api_router.include_router(backup_router)
 api_router.include_router(compliance_router)
 api_router.include_router(health_router)
 api_router.include_router(auth_router)
+api_router.include_router(auth_sso_router)
 api_router.include_router(incidents_router)
 api_router.include_router(changes_router)
 api_router.include_router(problems_router)
