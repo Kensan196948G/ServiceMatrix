@@ -137,9 +137,7 @@ async def train_anomaly_model(
     from datetime import datetime, timedelta
 
     cutoff = datetime.now(UTC) - timedelta(days=request.use_recent_days)
-    result = await db.execute(
-        select(Incident).where(Incident.created_at >= cutoff).limit(1000)
-    )
+    result = await db.execute(select(Incident).where(Incident.created_at >= cutoff).limit(1000))
     incidents = result.scalars().all()
 
     training_data = []

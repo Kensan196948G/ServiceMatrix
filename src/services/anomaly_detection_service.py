@@ -1,7 +1,6 @@
 """AI異常検知サービス - IsolationForest ベース"""
-import numpy as np
-from typing import Any
 
+import numpy as np
 import structlog
 
 logger = structlog.get_logger(__name__)
