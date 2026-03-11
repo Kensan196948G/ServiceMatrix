@@ -8,7 +8,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.database import get_db
-from src.middleware.rbac import get_current_user, require_role
+from src.middleware.rbac import require_role
 from src.models.incident import Incident
 from src.models.user import User, UserRole
 from src.services.predictive_analytics_service import predictive_analytics_service
@@ -19,7 +19,13 @@ router = APIRouter(prefix="/analytics", tags=["予測分析"])
 @router.get("/predictions", summary="インシデント発生予測")
 async def get_predictions(
     db: Annotated[AsyncSession, Depends(get_db)],
-    current_user: Annotated[User, Depends(require_role(UserRole.INCIDENT_MANAGER, UserRole.SERVICE_MANAGER, UserRole.SYSTEM_ADMIN, UserRole.CHANGE_MANAGER))],
+    current_user: Annotated[
+        User,
+        Depends(require_role(
+            UserRole.INCIDENT_MANAGER, UserRole.SERVICE_MANAGER,
+            UserRole.SYSTEM_ADMIN, UserRole.CHANGE_MANAGER,
+        )),
+    ],
     days: int = Query(default=7, ge=1, le=30, description="予測日数"),
 ) -> dict:
     """過去30日のインシデントデータから今後N日間の発生件数を予測する"""
@@ -54,7 +60,13 @@ async def get_predictions(
 @router.get("/predictions/summary", summary="今週の予測サマリー")
 async def get_predictions_summary(
     db: Annotated[AsyncSession, Depends(get_db)],
-    current_user: Annotated[User, Depends(require_role(UserRole.INCIDENT_MANAGER, UserRole.SERVICE_MANAGER, UserRole.SYSTEM_ADMIN, UserRole.CHANGE_MANAGER))],
+    current_user: Annotated[
+        User,
+        Depends(require_role(
+            UserRole.INCIDENT_MANAGER, UserRole.SERVICE_MANAGER,
+            UserRole.SYSTEM_ADMIN, UserRole.CHANGE_MANAGER,
+        )),
+    ],
 ) -> dict:
     """今後7日間の予測サマリー（合計件数・トレンド・信頼度）を返す"""
     now = datetime.now(UTC)
