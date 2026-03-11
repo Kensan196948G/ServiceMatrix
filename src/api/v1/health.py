@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.cache import health_check_redis
 from src.core.config import settings
-from src.core.database import get_db
+from src.core.database import get_db, get_db_read
 from src.core.metrics import metrics
 
 router = APIRouter(tags=["health"])
@@ -49,13 +49,22 @@ async def get_metrics_prometheus():
 
 
 @router.get("/health/detailed")
-async def detailed_health(db: Annotated[AsyncSession, Depends(get_db)]):
-    """詳細ヘルスチェック（DB接続・Redis接続・バージョン情報）"""
+async def detailed_health(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    db_read: Annotated[AsyncSession, Depends(get_db_read)],
+):
+    """詳細ヘルスチェック（DB接続・Read Replica接続・Redis接続・バージョン情報）"""
     try:
         await db.execute(text("SELECT 1"))
         db_status = "connected"
     except Exception:
         db_status = "error"
+
+    try:
+        await db_read.execute(text("SELECT 1"))
+        read_replica_status = "connected"
+    except Exception:
+        read_replica_status = "error"
 
     return {
         "status": "healthy" if db_status == "connected" else "degraded",
@@ -64,6 +73,9 @@ async def detailed_health(db: Annotated[AsyncSession, Depends(get_db)]):
         "services": {
             "api": "up",
             "database": db_status,
+            "database_read_replica": (
+                read_replica_status if settings.read_replica_enabled else "disabled"
+            ),
             "redis": "connected",
         },
     }
