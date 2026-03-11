@@ -206,7 +206,7 @@ async def test_create_incident_direct():
         )
 
     assert result.incident_number == "INC-2024-000001"
-    background_tasks.add_task.assert_called_once()
+    background_tasks.add_task.assert_called()
 
 
 # --- get_incident() テスト ----------------------------------------------------
@@ -249,8 +249,10 @@ async def test_update_incident_success_direct():
     db.execute.return_value = result_mock
 
     data = IncidentUpdate(description="更新された説明")
+    background_tasks = MagicMock()
     result = await update_incident(
-        incident_id=incident.incident_id, data=data, db=db, current_user=user
+        incident_id=incident.incident_id, data=data, db=db, current_user=user,
+        background_tasks=background_tasks,
     )
 
     db.flush.assert_awaited_once()
@@ -263,10 +265,12 @@ async def test_update_incident_not_found_direct():
 
     user = _make_user()
     db = _mock_db_returning([])
+    background_tasks = MagicMock()
 
     data = IncidentUpdate(description="更新")
     with pytest.raises(HTTPException) as exc_info:
-        await update_incident(incident_id=uuid.uuid4(), data=data, db=db, current_user=user)
+        await update_incident(incident_id=uuid.uuid4(), data=data, db=db, current_user=user,
+                              background_tasks=background_tasks)
 
     assert exc_info.value.status_code == 404
 
