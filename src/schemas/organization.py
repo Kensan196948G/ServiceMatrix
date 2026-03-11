@@ -1,4 +1,5 @@
 """Organization スキーマ"""
+
 import uuid
 from datetime import datetime
 
@@ -7,7 +8,7 @@ from pydantic import BaseModel, Field
 
 class OrganizationCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=255)
-    slug: str = Field(..., min_length=1, max_length=100, pattern=r'^[a-z0-9-]+$')
+    slug: str = Field(..., min_length=1, max_length=100, pattern=r"^[a-z0-9-]+$")
     settings: dict = Field(default_factory=dict)
 
 
