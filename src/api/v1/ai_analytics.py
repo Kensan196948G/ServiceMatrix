@@ -1,6 +1,7 @@
 """AI異常検知APIエンドポイント - IsolationForest ベース"""
 
 import uuid
+from datetime import UTC
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -57,11 +58,11 @@ async def get_anomaly_score(
     """指定インシデントの異常スコアを返す"""
     try:
         incident_uuid = uuid.UUID(incident_id)
-    except ValueError:
+    except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=f"無効なUUID形式です: {incident_id}",
-        )
+        ) from e
     result = await db.execute(select(Incident).where(Incident.incident_id == incident_uuid))
     incident = result.scalar_one_or_none()
     if not incident:
@@ -133,9 +134,9 @@ async def train_anomaly_model(
     current_user: Annotated[User, Depends(require_role(UserRole.SYSTEM_ADMIN))],
 ) -> dict:
     """最近のインシデントデータを使って異常検知モデルを再学習する"""
-    from datetime import datetime, timedelta, timezone
+    from datetime import datetime, timedelta
 
-    cutoff = datetime.now(timezone.utc) - timedelta(days=request.use_recent_days)
+    cutoff = datetime.now(UTC) - timedelta(days=request.use_recent_days)
     result = await db.execute(
         select(Incident).where(Incident.created_at >= cutoff).limit(1000)
     )
