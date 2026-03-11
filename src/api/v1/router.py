@@ -12,7 +12,9 @@ from src.api.v1.backup import router as backup_router
 from src.api.v1.changes import router as changes_router
 from src.api.v1.cmdb import router as cmdb_router
 from src.api.v1.compliance import router as compliance_router
+from src.api.v1.compliance_reports import router as compliance_reports_router
 from src.api.v1.dashboard import router as dashboard_router
+from src.api.v1.dashboards import router as dashboards_router
 from src.api.v1.health import router as health_router
 from src.api.v1.incidents import router as incidents_router
 from src.api.v1.integrations import router as integrations_router
@@ -21,14 +23,13 @@ from src.api.v1.maintenance import router as maintenance_router
 from src.api.v1.notifications import router as notifications_router
 from src.api.v1.predictions import router as predictions_router
 from src.api.v1.problems import router as problems_router
+from src.api.v1.remediation import router as remediation_router
 from src.api.v1.reports import router as reports_router
 from src.api.v1.search import router as search_router
 from src.api.v1.service_catalog import router as service_catalog_router
 from src.api.v1.service_requests import router as service_requests_router
 from src.api.v1.sla import router as sla_router
 from src.api.v1.telemetry import router as telemetry_router
-from src.api.v1.compliance_reports import router as compliance_reports_router
-from src.api.v1.remediation import router as remediation_router
 from src.api.v1.tenants import router as tenants_router
 from src.api.v1.webhooks import router as webhooks_router
 from src.api.v1.websocket import router as websocket_router
@@ -62,5 +63,6 @@ api_router.include_router(predictions_router)
 api_router.include_router(analytics_router)
 api_router.include_router(telemetry_router)
 api_router.include_router(compliance_reports_router)
+api_router.include_router(dashboards_router)
 api_router.include_router(remediation_router)
 api_router.include_router(tenants_router)
