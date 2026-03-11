@@ -8,7 +8,27 @@ from unittest.mock import AsyncMock, MagicMock
 # asyncpg が未インストールの場合はテスト全体をスキップ
 asyncpg = pytest.importorskip("asyncpg", reason="asyncpg not installed; skipping PG tests")
 
-pytestmark = [pytest.mark.asyncio, pytest.mark.pg]
+import asyncio
+import os
+
+def _pg_available() -> bool:
+    """PostgreSQL への接続確認（起動していない場合は False）"""
+    import socket
+    url = os.getenv("TEST_DATABASE_URL", "")
+    host, port = "localhost", 5433
+    if "localhost:5433" in url or not url:
+        pass  # デフォルト設定を使用
+    try:
+        with socket.create_connection((host, port), timeout=1):
+            return True
+    except OSError:
+        return False
+
+pytestmark = [
+    pytest.mark.asyncio,
+    pytest.mark.pg,
+    pytest.mark.skipif(not _pg_available(), reason="PostgreSQL not running; skipping PG tests"),
+]
 
 # conftest_pg.py のフィクスチャをインポート
 pytest_plugins = ["tests.conftest_pg"]
