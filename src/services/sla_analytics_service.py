@@ -1,13 +1,13 @@
 """SLAトレンド分析サービス"""
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import structlog
-from sqlalchemy import select, func, and_
+from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.models.incident import Incident
 from src.models.change import Change
+from src.models.incident import Incident
 
 logger = structlog.get_logger(__name__)
 
@@ -18,7 +18,7 @@ async def get_incident_sla_trends(
     department: str | None = None,
 ) -> dict[str, Any]:
     """過去N日間のインシデントSLAトレンドを返す"""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     since = now - timedelta(days=days)
 
     # 基本クエリ構築
@@ -88,7 +88,7 @@ async def get_change_success_trends(
     days: int = 30,
 ) -> dict[str, Any]:
     """過去N日間の変更管理成功率トレンドを返す"""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     since = now - timedelta(days=days)
 
     stmt = select(Change).where(Change.created_at >= since)
@@ -191,7 +191,7 @@ async def get_summary_metrics(
     pending_changes = chg_pending_result.scalar() or 0
 
     # 直近24時間のインシデント数
-    last_24h = datetime.now(timezone.utc) - timedelta(hours=24)
+    last_24h = datetime.now(UTC) - timedelta(hours=24)
     inc_24h_stmt = select(func.count()).select_from(Incident).where(
         Incident.created_at >= last_24h
     )
@@ -229,5 +229,5 @@ async def get_summary_metrics(
         "incidents_last_24h": incidents_last_24h,
         "open_p1_incidents": open_p1_incidents,
         "active_changes": active_changes,
-        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "generated_at": datetime.now(UTC).isoformat(),
     }
