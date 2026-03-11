@@ -1,13 +1,16 @@
 """変更管理API - CRUD + リスク評価 + CAB承認"""
 
+import json
 import uuid
 from datetime import datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.encoders import jsonable_encoder
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.core.cache import cache_delete_pattern, cache_get, cache_set
 from src.core.database import get_db
 from src.middleware.rbac import get_current_user, require_role
 from src.models.change import Change
@@ -44,6 +47,11 @@ async def list_changes(
     status_filter: str | None = Query(default=None, alias="status"),
 ):
     """変更一覧取得"""
+    cache_key = f"changes:list:{page}:{size}:{status_filter}"
+    cached = await cache_get(cache_key)
+    if cached is not None:
+        return json.loads(cached)
+
     query = select(Change)
     if status_filter:
         query = query.where(Change.status == status_filter)
@@ -55,13 +63,15 @@ async def list_changes(
     result = await db.execute(query)
     items = list(result.scalars().all())
 
-    return PaginatedResponse(
+    response_data = PaginatedResponse(
         items=items,
         total=total,
         page=page,
         size=size,
         pages=(total + size - 1) // size,
     )
+    await cache_set(cache_key, json.dumps(jsonable_encoder(response_data)), ttl=60)
+    return response_data
 
 
 @router.post(
@@ -93,6 +103,7 @@ async def create_change(
         },
         channel="changes",
     )
+    await cache_delete_pattern("changes:list:*")
     return change
 
 
@@ -213,6 +224,7 @@ async def update_change(
         setattr(change, field, value)
     await db.flush()
     await db.refresh(change)
+    await cache_delete_pattern("changes:list:*")
     return change
 
 
