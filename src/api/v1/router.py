@@ -25,6 +25,7 @@ from src.api.v1.search import router as search_router
 from src.api.v1.service_catalog import router as service_catalog_router
 from src.api.v1.service_requests import router as service_requests_router
 from src.api.v1.sla import router as sla_router
+from src.api.v1.telemetry import router as telemetry_router
 from src.api.v1.webhooks import router as webhooks_router
 from src.api.v1.websocket import router as websocket_router
 
@@ -54,3 +55,4 @@ api_router.include_router(integrations_sync_router)
 api_router.include_router(maintenance_router)
 api_router.include_router(predictions_router)
 api_router.include_router(analytics_router)
+api_router.include_router(telemetry_router)

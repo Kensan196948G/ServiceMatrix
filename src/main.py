@@ -11,16 +11,19 @@ from src.api.v1.router import api_router
 from src.core.config import settings
 from src.core.logging import setup_logging
 from src.core.rate_limit import limiter
+from src.core.telemetry import setup_telemetry
 from src.middleware.audit import AuditMiddleware
 from src.middleware.metrics import MetricsMiddleware
 from src.middleware.rate_limit import RateLimitMiddleware
 from src.middleware.security_headers import SecurityHeadersMiddleware
+from src.middleware.tracing import TracingMiddleware
 from src.services.sla_monitor_service import sla_monitor
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     setup_logging()
+    setup_telemetry()
     await sla_monitor.start()
     yield
     await sla_monitor.stop()
@@ -126,6 +129,13 @@ Bearer Token (JWT) 認証を使用します。
                 "name": "health",
                 "description": "ヘルスチェック・サービス稼働状況確認。",
             },
+            {
+                "name": "telemetry",
+                "description": (
+                    "OpenTelemetry分散トレーシング。"
+                    "現在のトレース状態確認・trace_id/span_idの取得。"
+                ),
+            },
         ],
     )
 
@@ -136,6 +146,7 @@ Bearer Token (JWT) 認証を使用します。
         allow_methods=["*"],
         allow_headers=["*"],
     )
+    app.add_middleware(TracingMiddleware)
     app.add_middleware(AuditMiddleware)
     app.add_middleware(MetricsMiddleware)
     if settings.security_headers_enabled:
