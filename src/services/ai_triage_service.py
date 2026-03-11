@@ -177,6 +177,45 @@ class OllamaTriageProvider(TriageProvider):
             return await KeywordTriageProvider().analyze(title, description)
 
 
+class AnthropicTriageProvider(TriageProvider):
+    """Anthropic Claude API使用トリアージ（claude-3-5-haiku等）"""
+
+    DEFAULT_MODEL = "claude-3-5-haiku-20241022"
+
+    def __init__(self, api_key: str, model: str = DEFAULT_MODEL):
+        self.api_key = api_key
+        self.model = model
+
+    async def analyze(self, title: str, description: str | None) -> AITriageResult:
+        try:
+            import json  # noqa: PLC0415
+
+            import anthropic  # noqa: PLC0415
+
+            client = anthropic.AsyncAnthropic(api_key=self.api_key)
+            prompt = _TRIAGE_PROMPT.format(title=title, description=description or "")
+
+            message = await client.messages.create(
+                model=self.model,
+                max_tokens=256,
+                messages=[{"role": "user", "content": prompt}],
+            )
+            content = message.content[0].text if message.content else "{}"
+            data = json.loads(content)
+            return AITriageResult(
+                priority=data.get("priority", "Medium"),
+                category=data.get("category", "Unknown"),
+                confidence=float(data.get("confidence", 0.5)),
+                reasoning=data.get("reasoning", "Anthropic Claude triage"),
+            )
+        except ImportError:
+            logger.warning("anthropic package not installed; falling back to keyword triage")
+            return await KeywordTriageProvider().analyze(title, description)
+        except Exception as e:
+            logger.warning("Anthropic triage failed (%s); falling back to keyword triage", e)
+            return await KeywordTriageProvider().analyze(title, description)
+
+
 def get_triage_provider() -> TriageProvider:
     """設定に基づいてプロバイダーを返すファクトリ関数"""
     provider = settings.llm_provider
@@ -189,6 +228,8 @@ def get_triage_provider() -> TriageProvider:
     if provider == "ollama":
         base_url = settings.openai_api_base or OllamaTriageProvider.DEFAULT_BASE_URL
         return OllamaTriageProvider(base_url=base_url, model=settings.llm_model)
+    if provider == "anthropic" and settings.openai_api_key:
+        return AnthropicTriageProvider(settings.openai_api_key, settings.llm_model)
     return KeywordTriageProvider()
 
 

@@ -454,3 +454,85 @@ def test_get_triage_provider_ollama_default_url():
 
     assert isinstance(provider, OllamaTriageProvider)
     assert provider.base_url == OllamaTriageProvider.DEFAULT_BASE_URL
+
+
+# ─── AnthropicTriageProvider ─────────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_anthropic_provider_analyze_success():
+    """AnthropicTriageProvider: 正常系 → AITriageResult を返す"""
+    import sys
+
+    from src.services.ai_triage_service import AnthropicTriageProvider
+
+    provider = AnthropicTriageProvider(api_key="test-key")
+
+    mock_content = MagicMock()
+    mock_content.text = '{"priority": "High", "category": "Network", "confidence": 0.85, "reasoning": "network issue"}'
+
+    mock_message = MagicMock()
+    mock_message.content = [mock_content]
+
+    mock_client = AsyncMock()
+    mock_client.messages.create = AsyncMock(return_value=mock_message)
+
+    mock_anthropic_module = MagicMock()
+    mock_anthropic_module.AsyncAnthropic = MagicMock(return_value=mock_client)
+
+    with patch.dict(sys.modules, {"anthropic": mock_anthropic_module}):
+        result = await provider.analyze("ネットワーク障害", "接続タイムアウト")
+
+    assert result.priority == "High"
+    assert result.category == "Network"
+    assert result.confidence == 0.85
+
+
+@pytest.mark.asyncio
+async def test_anthropic_provider_analyze_exception_fallback():
+    """AnthropicTriageProvider: 例外発生 → キーワードトリアージにフォールバック"""
+    import sys
+
+    from src.services.ai_triage_service import AnthropicTriageProvider
+
+    provider = AnthropicTriageProvider(api_key="test-key")
+
+    mock_client = AsyncMock()
+    mock_client.messages.create = AsyncMock(side_effect=Exception("API error"))
+
+    mock_anthropic_module = MagicMock()
+    mock_anthropic_module.AsyncAnthropic = MagicMock(return_value=mock_client)
+
+    with patch.dict(sys.modules, {"anthropic": mock_anthropic_module}):
+        result = await provider.analyze("critical system outage", "全停止")
+
+    assert result.priority == "Critical"
+
+
+@pytest.mark.asyncio
+async def test_anthropic_provider_import_error_fallback():
+    """AnthropicTriageProvider: anthropic未インストール → キーワードトリアージにフォールバック"""
+    import sys
+
+    from src.services.ai_triage_service import AnthropicTriageProvider
+
+    provider = AnthropicTriageProvider(api_key="test-key")
+
+    with patch.dict(sys.modules, {"anthropic": None}):
+        result = await provider.analyze("network error timeout", None)
+
+    assert result.priority in ("Critical", "High", "Medium", "Low")
+
+
+def test_get_triage_provider_anthropic():
+    """get_triage_provider: llm_provider=anthropic → AnthropicTriageProvider を返す"""
+    from src.services.ai_triage_service import AnthropicTriageProvider, get_triage_provider
+
+    with patch("src.services.ai_triage_service.settings") as mock_settings:
+        mock_settings.llm_provider = "anthropic"
+        mock_settings.openai_api_key = "test-anthropic-key"
+        mock_settings.llm_model = "claude-3-5-haiku-20241022"
+        provider = get_triage_provider()
+
+    assert isinstance(provider, AnthropicTriageProvider)
+    assert provider.api_key == "test-anthropic-key"
