@@ -80,7 +80,7 @@ async def test_health_endpoint_includes_redis(client):
         "latency_ms": 0.5,
     }
 
-    with patch.object(cache_module, "health_check_redis", new=AsyncMock(return_value=mock_redis_info)):
+    with patch("src.api.v1.health.health_check_redis", new=AsyncMock(return_value=mock_redis_info)):
         response = await client.get("/api/v1/health")
 
     assert response.status_code == 200
