@@ -21,12 +21,10 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-pytestmark = pytest.mark.asyncio
-
-
 # ─── main.py: lifespan context manager (lines 23-26) ──────────────────────────
 
 
+@pytest.mark.asyncio
 async def test_lifespan_starts_and_stops_sla_monitor():
     """lifespan: sla_monitor.start() / stop() を呼び出す"""
     from src.main import lifespan, create_app
@@ -48,6 +46,7 @@ async def test_lifespan_starts_and_stops_sla_monitor():
 # ─── backup.py: pg_dump 実行分岐 (lines 50-61) ────────────────────────────────
 
 
+@pytest.mark.asyncio
 async def test_create_backup_postgresql_success():
     """create_backup: PostgreSQL環境でpg_dump成功 → type=postgresql"""
     from src.api.v1.backup import create_backup
@@ -73,6 +72,7 @@ async def test_create_backup_postgresql_success():
     mock_run.assert_called_once()
 
 
+@pytest.mark.asyncio
 async def test_create_backup_postgresql_failure_raises_500():
     """create_backup: pg_dump 失敗 → HTTPException 500"""
     from fastapi import HTTPException
@@ -100,6 +100,7 @@ async def test_create_backup_postgresql_failure_raises_500():
 # ─── incidents.py: bulk_update else分岐 (lines 286-287) ─────────────────────
 
 
+@pytest.mark.asyncio
 async def test_bulk_update_invalid_action_adds_to_failed():
     """bulk_update_incidents: 無効アクション → failed_ids に追加"""
     from src.api.v1.incidents import bulk_update_incidents, BulkIncidentUpdate
@@ -133,6 +134,7 @@ async def test_bulk_update_invalid_action_adds_to_failed():
 # ─── incidents.py: description内サービス名マッチ (line 508) ─────────────────
 
 
+@pytest.mark.asyncio
 async def test_bulk_update_exception_during_loop_adds_to_failed():
     """bulk_update_incidents: ループ内で例外発生 → except Exception で failed_ids に追加 (lines 286-287)"""
     from src.api.v1.incidents import bulk_update_incidents, BulkIncidentUpdate
@@ -157,6 +159,7 @@ async def test_bulk_update_exception_during_loop_adds_to_failed():
     assert iid in result.failed_ids
 
 
+@pytest.mark.asyncio
 async def test_suggest_problem_description_match_scores_0_3():
     """suggest_problem: description内にserviceが含まれる → score += 0.3"""
     from src.api.v1.incidents import suggest_problem
@@ -234,6 +237,7 @@ def test_get_password_hash_returns_hashed_string():
 # ─── middleware/audit.py: AUDIT_EXCLUDE_PATHS早期リターン (line 25) ──────────
 
 
+@pytest.mark.asyncio
 async def test_audit_middleware_excludes_health_path():
     """AuditMiddleware: /health パスは早期リターン（AUDIT_EXCLUDE_PATHS）"""
     from fastapi import FastAPI
@@ -272,6 +276,7 @@ async def test_audit_middleware_excludes_health_path():
 # ─── middleware/rbac.py: user.is_active=False (line 55) ─────────────────────
 
 
+@pytest.mark.asyncio
 async def test_get_current_user_inactive_user_raises_401():
     """get_current_user: is_active=False → credentials_exception"""
     from fastapi import HTTPException
@@ -305,6 +310,7 @@ async def test_get_current_user_inactive_user_raises_401():
     assert exc_info.value.status_code == 401
 
 
+@pytest.mark.asyncio
 async def test_get_current_user_active_user_returns_user():
     """get_current_user: is_active=True → return user (line 55)"""
     from src.middleware.rbac import get_current_user
@@ -334,6 +340,7 @@ async def test_get_current_user_active_user_returns_user():
 # ─── ai_service.py: json.loads例外 → _mock_rca() (lines 93-94) ──────────────
 
 
+@pytest.mark.asyncio
 async def test_analyze_rca_invalid_json_falls_back_to_mock():
     """generate_rca_report: json.loads失敗 → _mock_rca()を返す"""
     from src.services.ai_service import AIService
@@ -358,6 +365,7 @@ async def test_analyze_rca_invalid_json_falls_back_to_mock():
 # ─── ai_service.py: anthropic ImportError → None (lines 158-159) ────────────
 
 
+@pytest.mark.asyncio
 async def test_anthropic_text_import_error_returns_none():
     """_anthropic_text: anthropic ImportError → None (ImportError except branch)"""
     from src.services.ai_service import AIService
@@ -382,6 +390,7 @@ async def test_anthropic_text_import_error_returns_none():
     assert result is None
 
 
+@pytest.mark.asyncio
 async def test_anthropic_text_api_exception_returns_none():
     """_anthropic_text: anthropic API呼び出し時に一般例外 → None (lines 158-159)"""
     from src.services.ai_service import AIService
@@ -407,6 +416,7 @@ async def test_anthropic_text_api_exception_returns_none():
 # ─── compliance.py: SLA FAIL分岐 (lines 189-190) ────────────────────────────
 
 
+@pytest.mark.asyncio
 async def test_evaluate_checks_sla_fail_when_field_missing():
     """_evaluate_checks: sla_field_existsがFalse → SLA FAIL分岐 (lines 189-190)"""
     from src.api.v1.compliance import _evaluate_checks
@@ -445,6 +455,7 @@ async def test_evaluate_checks_sla_fail_when_field_missing():
 # ─── sla_monitor_service.py: APScheduler ImportError → asyncio fallback (lines 102-106) ─
 
 
+@pytest.mark.asyncio
 async def test_sla_monitor_start_importerror_falls_back_to_asyncio():
     """SLAMonitorService.start: APScheduler ImportError → asyncio create_task fallback"""
     from src.services.sla_monitor_service import SLAMonitorService
@@ -456,14 +467,17 @@ async def test_sla_monitor_start_importerror_falls_back_to_asyncio():
     task_mock = MagicMock()
     task_mock.cancel = MagicMock()
 
-    # apscheduler モジュールが利用不可の状況をシミュレート
-    original_modules = {}
-    import sys
-
     # APSchedulerのImportErrorをシミュレート
     async def mock_monitor_loop():
         pass
 
+    # コルーチンを名前付きで作成して明示的に close() でクリーンアップする
+    coro = mock_monitor_loop()
+    # _monitor_loop は async def なので patch.object はデフォルトで AsyncMock を使用し
+    # _execute_mock_call コルーチンをリークさせる。new=MagicMock(...) で強制的に
+    # 同期モックにしてリークを防止する。
+    _loop_mock = MagicMock(return_value=coro)
+    mock_create_task = MagicMock(return_value=task_mock)
     with (
         patch.dict(
             "sys.modules",
@@ -475,10 +489,11 @@ async def test_sla_monitor_start_importerror_falls_back_to_asyncio():
                 "apscheduler.triggers.interval": None,
             },
         ),
-        patch.object(svc, "_monitor_loop", return_value=mock_monitor_loop()),
-        patch("asyncio.create_task", return_value=task_mock) as mock_create_task,
+        patch.object(svc, "_monitor_loop", new=_loop_mock),
+        patch("asyncio.create_task", new=mock_create_task),
     ):
         await svc.start()
+    coro.close()  # 未 await コルーチンを明示クローズ → RuntimeWarning 防止
 
     assert svc.running is True
     mock_create_task.assert_called_once()
