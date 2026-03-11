@@ -5,7 +5,7 @@ from typing import Annotated, Any
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 
-from src.middleware.rbac import get_current_user, require_role
+from src.middleware.rbac import require_role
 from src.models.user import User, UserRole
 from src.services.integration_sync_service import integration_sync_service
 

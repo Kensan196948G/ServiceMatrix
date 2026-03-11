@@ -1,9 +1,9 @@
 """外部ITSM同期サービス基盤（Jira / ServiceNow）"""
-import json
-from datetime import datetime
+
 from typing import Any
-import structlog
+
 import httpx
+import structlog
 
 logger = structlog.get_logger(__name__)
 
@@ -94,7 +94,9 @@ class IntegrationSyncService:
     ) -> dict[str, Any]:
         """インシデントを ServiceNow チケットに同期（モック実装）"""
         mapped = self.map_fields(incident_data, "servicenow", "outbound")
-        logger.info("sync_to_servicenow", incident_id=incident_data.get("incident_id"), mapped=mapped)
+        logger.info(
+            "sync_to_servicenow", incident_id=incident_data.get("incident_id"), mapped=mapped
+        )
         return {
             "success": True,
             "sys_id": f"SN-{incident_data.get('incident_id', 'MOCK')[:8]}",
