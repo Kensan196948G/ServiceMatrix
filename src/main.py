@@ -16,6 +16,7 @@ from src.core.telemetry import setup_telemetry
 from src.middleware.audit import AuditMiddleware
 from src.middleware.metrics import MetricsMiddleware
 from src.middleware.rate_limit import RateLimitMiddleware
+from src.middleware.request_sanitizer import RequestSanitizerMiddleware
 from src.middleware.security_headers import SecurityHeadersMiddleware
 from src.middleware.tenant import TenantMiddleware
 from src.middleware.tracing import TracingMiddleware
@@ -158,6 +159,7 @@ Bearer Token (JWT) 認証を使用します。
         allow_methods=["*"],
         allow_headers=["*"],
     )
+    app.add_middleware(RequestSanitizerMiddleware)
     app.add_middleware(TracingMiddleware)
     app.add_middleware(TenantMiddleware)
     app.add_middleware(AuditMiddleware)
