@@ -66,7 +66,9 @@ async def detailed_health(
         "services": {
             "api": "up",
             "database": db_status,
-            "database_read_replica": read_replica_status if settings.read_replica_enabled else "disabled",
+            "database_read_replica": (
+                read_replica_status if settings.read_replica_enabled else "disabled"
+            ),
             "redis": "connected",
         },
     }
