@@ -1,4 +1,5 @@
 """SLAトレンド分析サービス"""
+
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -40,7 +41,7 @@ async def get_incident_sla_trends(
         created = inc.created_at
         if created is not None:
             # timezone-aware/naive の両方を考慮
-            if hasattr(created, 'date'):
+            if hasattr(created, "date"):
                 date_str = created.strftime("%Y-%m-%d")
             else:
                 date_str = str(created)[:10]
@@ -167,51 +168,63 @@ async def get_summary_metrics(
 ) -> dict[str, Any]:
     """ダッシュボード用サマリーメトリクスを返す"""
     # オープンインシデント数
-    inc_open_stmt = select(func.count()).select_from(Incident).where(
-        Incident.status.in_(["New", "Acknowledged", "In_Progress", "Pending", "Workaround_Applied"])
+    inc_open_stmt = (
+        select(func.count())
+        .select_from(Incident)
+        .where(
+            Incident.status.in_(
+                ["New", "Acknowledged", "In_Progress", "Pending", "Workaround_Applied"]
+            )
+        )
     )
     inc_open_result = await db.execute(inc_open_stmt)
     open_incidents = inc_open_result.scalar() or 0
 
     # SLA違反インシデント数（未解決）
-    sla_breach_stmt = select(func.count()).select_from(Incident).where(
-        and_(
-            Incident.sla_breached.is_(True),
-            Incident.status.notin_(["Resolved", "Closed"]),
+    sla_breach_stmt = (
+        select(func.count())
+        .select_from(Incident)
+        .where(
+            and_(
+                Incident.sla_breached.is_(True),
+                Incident.status.notin_(["Resolved", "Closed"]),
+            )
         )
     )
     sla_breach_result = await db.execute(sla_breach_stmt)
     active_sla_breaches = sla_breach_result.scalar() or 0
 
     # 変更承認待ち数
-    chg_pending_stmt = select(func.count()).select_from(Change).where(
-        Change.status.in_(["Submitted", "CAB_Review"])
+    chg_pending_stmt = (
+        select(func.count())
+        .select_from(Change)
+        .where(Change.status.in_(["Submitted", "CAB_Review"]))
     )
     chg_pending_result = await db.execute(chg_pending_stmt)
     pending_changes = chg_pending_result.scalar() or 0
 
     # 直近24時間のインシデント数
     last_24h = datetime.now(UTC) - timedelta(hours=24)
-    inc_24h_stmt = select(func.count()).select_from(Incident).where(
-        Incident.created_at >= last_24h
-    )
+    inc_24h_stmt = select(func.count()).select_from(Incident).where(Incident.created_at >= last_24h)
     inc_24h_result = await db.execute(inc_24h_stmt)
     incidents_last_24h = inc_24h_result.scalar() or 0
 
     # P1インシデント数（オープン）
-    p1_stmt = select(func.count()).select_from(Incident).where(
-        and_(
-            Incident.priority == "P1",
-            Incident.status.in_(["New", "Acknowledged", "In_Progress"]),
+    p1_stmt = (
+        select(func.count())
+        .select_from(Incident)
+        .where(
+            and_(
+                Incident.priority == "P1",
+                Incident.status.in_(["New", "Acknowledged", "In_Progress"]),
+            )
         )
     )
     p1_result = await db.execute(p1_stmt)
     open_p1_incidents = p1_result.scalar() or 0
 
     # 進行中の変更数
-    chg_active_stmt = select(func.count()).select_from(Change).where(
-        Change.status == "In_Progress"
-    )
+    chg_active_stmt = select(func.count()).select_from(Change).where(Change.status == "In_Progress")
     chg_active_result = await db.execute(chg_active_stmt)
     active_changes = chg_active_result.scalar() or 0
 

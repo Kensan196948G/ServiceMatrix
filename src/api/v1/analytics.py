@@ -61,11 +61,16 @@ async def summary_metrics(
 
 @router.get("/export/csv", summary="SLAトレンドCSVエクスポート")
 async def export_csv(
-    current_user: Annotated[User, Depends(require_role(
-        UserRole.SERVICE_MANAGER,
-        UserRole.CHANGE_MANAGER,
-        UserRole.SYSTEM_ADMIN,
-    ))],
+    current_user: Annotated[
+        User,
+        Depends(
+            require_role(
+                UserRole.SERVICE_MANAGER,
+                UserRole.CHANGE_MANAGER,
+                UserRole.SYSTEM_ADMIN,
+            )
+        ),
+    ],
     db: Annotated[AsyncSession, Depends(get_db)],
     days: int = Query(default=30, ge=1, le=365, description="集計対象日数"),
 ) -> StreamingResponse:
@@ -88,27 +93,25 @@ async def export_csv(
         row_total = row["count"]
         row_breaches = row["breaches"]
         row_compliance = (
-            round((row_total - row_breaches) / row_total * 100, 1)
-            if row_total > 0
-            else 100.0
+            round((row_total - row_breaches) / row_total * 100, 1) if row_total > 0 else 100.0
         )
         writer.writerow([row["date"], row_total, row_breaches, row_compliance])
 
     # サマリー行
     writer.writerow([])
     writer.writerow(["summary", "total_incidents", "sla_breaches", "compliance_rate"])
-    writer.writerow([
-        f"last_{days}_days",
-        total,
-        breaches_total,
-        data["sla_compliance_rate"],
-    ])
+    writer.writerow(
+        [
+            f"last_{days}_days",
+            total,
+            breaches_total,
+            data["sla_compliance_rate"],
+        ]
+    )
 
     output.seek(0)
     return StreamingResponse(
         iter([output.getvalue()]),
         media_type="text/csv",
-        headers={
-            "Content-Disposition": f"attachment; filename=sla_trends_{days}days.csv"
-        },
+        headers={"Content-Disposition": f"attachment; filename=sla_trends_{days}days.csv"},
     )
