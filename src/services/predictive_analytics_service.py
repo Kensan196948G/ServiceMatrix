@@ -26,7 +26,8 @@ class PredictiveAnalyticsService:
             forecast_days: 予測日数
 
         Returns:
-            {"predictions": [{"date": "...", "predicted_count": N, "lower": N, "upper": N}], "model": "prophet"|"linear"}
+            {"predictions": [{"date": "...", "predicted_count": N, "lower": N, "upper": N}],
+            "model": "prophet"|"linear"}
         """
         if len(historical_data) < 3:
             return self._empty_forecast(forecast_days)
@@ -80,8 +81,8 @@ class PredictiveAnalyticsService:
 
     def _prophet_forecast(self, data: list[dict], forecast_days: int) -> dict[str, Any]:
         """Prophet による予測（オプション依存）"""
-        from prophet import Prophet  # noqa: PLC0415
         import pandas as pd  # noqa: PLC0415
+        from prophet import Prophet  # noqa: PLC0415
 
         df = pd.DataFrame([{"ds": d["date"], "y": d["count"]} for d in data])
         model = Prophet(
